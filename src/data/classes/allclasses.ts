@@ -1,4 +1,14 @@
-const classes = {
+interface ClassDetails {
+  abilities: string[]; // List of abilities for the class
+  description: string; // Description of the class
+  state?: string; // Optional state property, can be "locked" or undefined
+}
+
+interface Classes {
+  [key: string]: ClassDetails; // Index signature for class names
+}
+
+const classes: Classes = {
   Knight: {
     abilities: ["Shield Bash", "Defend"],
     description:
@@ -73,4 +83,4 @@ const classes = {
   },
 };
 
-module.exports = classes;
+export default classes;

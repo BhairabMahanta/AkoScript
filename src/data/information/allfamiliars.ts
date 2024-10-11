@@ -1,4 +1,44 @@
-const allFamiliars = {
+interface Move {
+  id: number;
+  name: string;
+  power: number;
+  cooldown: number;
+  level: number;
+}
+
+interface Stats {
+  attack: number;
+  defense: number;
+  speed: number;
+  hp: number;
+}
+
+interface Experience {
+  current: number;
+  required: number;
+  level: number;
+}
+
+interface Familiar {
+  id: number;
+  sl: number; // Assuming this stands for "slot" or similar
+  name: string;
+  element: string;
+  tier: number;
+  stats: Stats;
+  experience: Experience;
+  moves: Move[];
+}
+
+interface Tier {
+  [key: string]: Familiar;
+}
+
+interface AllFamiliars {
+  [tier: string]: Tier;
+}
+
+const allFamiliars: AllFamiliars = {
   Tier1: {
     "Fire Blob": {
       id: 1,
@@ -1343,5 +1383,4 @@ const allFamiliars = {
     },
   },
 };
-
-module.exports = { allFamiliars };
+export default allFamiliars;

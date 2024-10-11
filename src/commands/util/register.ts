@@ -21,6 +21,7 @@ import locations from "../../data/locations";
 import { allFamiliars } from "../../data/information/allfamiliars.js";
 import { ExtendedClient } from "../..";
 import { Command } from "../../@types/command";
+import { capitalizeFirstLetter } from "./glogic";
 
 const collectionName = "akaillection";
 const story = require("./story.json"); // Load the story from the JSON file
@@ -60,8 +61,8 @@ const registerCommand: Command = {
       }
     }
 
-    // const characterName = capitalizeFirstLetter(args[0]);
-    const characterName = args[0];
+    const characterName = capitalizeFirstLetter(args[0]);
+
     console.log("characterName:", characterName);
 
     // Check if the character name already exists
