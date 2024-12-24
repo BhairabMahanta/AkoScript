@@ -1,5 +1,29 @@
-// quests.js
-const quests = {
+// Define interfaces for the structure of quests
+export interface Objective {
+  id: string;
+  description: string;
+  target: string;
+  current: number;
+  required: number;
+}
+
+export interface Reward {
+  experience: number;
+  items: string[];
+}
+
+export interface QuestInterface {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  objectives: Objective[];
+  rewards: Reward[];
+  timeLimit: number;
+}
+
+// Define the quests object with strong typing
+const quests: Record<string, QuestInterface> = {
   monster_subjugation: {
     id: "monster_subjugation",
     title: "Monster Subjugation",
@@ -105,4 +129,4 @@ const quests = {
   // Define more quests...
 };
 
-module.exports = { quests };
+export { quests };

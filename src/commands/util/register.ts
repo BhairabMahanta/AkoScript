@@ -17,8 +17,8 @@ import { playerModel } from "../../data/mongo/playerschema"; // Adjust the path 
 import { Tutorial } from "./tutorial.js";
 import * as fs from "fs";
 import players from "../../data/players.json";
-import locations from "../../data/locations";
-import { allFamiliars } from "../../data/information/allfamiliars.js";
+import { locations } from "../../data/locations";
+import allFamiliars from "../../data/information/allfamiliars";
 import { ExtendedClient } from "../..";
 import { Command } from "../../@types/command";
 import { capitalizeFirstLetter } from "./glogic";
@@ -213,7 +213,12 @@ const registerCommand: Command = {
       selectedFamiliars: {
         name: [randomCardName],
       },
+      quests: [],
+      activeQuests: {},
     });
+    playerData2.gainExperience(50);
+
+    playerData2.gainItems(["Sword", "Shield"]);
 
     // Save the player data to the database
     try {

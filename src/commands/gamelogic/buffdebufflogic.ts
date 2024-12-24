@@ -9,11 +9,11 @@ interface Buff {
 interface ExtendedPlayer extends Player {
   statuses: {
     buffs: BuffDetails[];
-    debuffs: BuffDetails[];
+    debuffs: DebuffDetails[];
   };
 }
 
-const buffs: Record<string, Buff> = {
+export const buffs: Record<string, Buff> = {
   "Attack Boost": {
     name: "Attack Boost",
     description: "Boosts your attack power.",
@@ -31,7 +31,7 @@ const buffs: Record<string, Buff> = {
   },
 };
 
-const debuffs: Record<string, Buff> = {
+export const debuffs: Record<string, Buff> = {
   "Attack Break": {
     name: "Attack Break",
     description: "Reduces your attack power.",
@@ -53,7 +53,7 @@ const debuffs: Record<string, Buff> = {
     effect: "stun",
   },
 };
-interface BuffDetails {
+export interface BuffDetails {
   buffType: string;
   name: string;
   value_amount: {
@@ -64,10 +64,10 @@ interface BuffDetails {
   flat?: boolean;
   unique?: boolean;
   turnLimit: number;
-  targets: number;
+  targets: ExtendedPlayer | ExtendedPlayer[];
 }
 
-interface DebuffDetails {
+export interface DebuffDetails {
   debuffType: string;
   name: string;
   value_amount: {
@@ -76,6 +76,9 @@ interface DebuffDetails {
     defense: number;
   };
   flat?: boolean;
+  unique?: boolean;
+  turnLimit: number;
+  targets: ExtendedPlayer | ExtendedPlayer[];
 }
 
 let that2: any;
@@ -303,7 +306,10 @@ class BuffDebuffLogic {
     this.battleLogs.push(logMessage);
   }
 
-  async decreaseWhat(target: Player | Player[], debuffDetails: DebuffDetails) {
+  async decreaseWhat(
+    target: ExtendedPlayer | ExtendedPlayer[],
+    debuffDetails: DebuffDetails
+  ) {
     const debuffs = debuffDetails.debuffType.split("_and_");
     let derArray: string[] = [];
     let statChanges: string[] = [];
@@ -359,10 +365,14 @@ class BuffDebuffLogic {
   }
 
   async increaseAttackNSpeed(
-    target: Player | Player[],
+    target: ExtendedPlayer | ExtendedPlayer[],
     buffDetails: BuffDetails
   ) {
-    if (buffDetails.unique === true && buffDetails.targets > 1) {
+    const targetArray = Array.isArray(buffDetails.targets)
+      ? buffDetails.targets
+      : [buffDetails.targets];
+
+    if (buffDetails.unique === true && targetArray.length > 1) {
       let derArray: string[] = [];
       let buff: any;
 
@@ -404,17 +414,17 @@ class BuffDebuffLogic {
       };
 
       if (buff.flat) {
-        (target as Target).stats.attack += buff.attack_amount;
-        (target as Target).stats.speed += buff.speed_amount;
+        (target as Player).stats.attack += buff.attack_amount;
+        (target as Player).stats.speed += buff.speed_amount;
       } else {
-        (target as Target).stats.attack +=
-          (target as Target).stats.attack * (buff.attack_amount / 100);
-        (target as Target).stats.speed +=
-          (target as Target).stats.speed * (buff.speed_amount / 100);
+        (target as Player).stats.attack +=
+          (target as Player).stats.attack * (buff.attack_amount / 100);
+        (target as Player).stats.speed +=
+          (target as Player).stats.speed * (buff.speed_amount / 100);
       }
 
       this.battleLogs.push(
-        `${(target as Target).name} received ${
+        `${(target as Player).name} received ${
           buffDetails.name
         } buff, increasing attack by ${buff.attack_amount}${
           buff.flat ? "" : "%"
@@ -424,4 +434,4 @@ class BuffDebuffLogic {
   }
 }
 
-export { BuffDebuffLogic, BuffDetails, DebuffDetails };
+export { BuffDebuffLogic };

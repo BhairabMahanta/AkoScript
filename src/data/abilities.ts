@@ -439,51 +439,84 @@ const abilities: { [key: string]: Ability } = {
   "Flame Strike": {
     name: "Flame Strike",
     description: "Attack with a fiery strike",
-    power: 20,
     cooldown: 3,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
   "Dragon Claw": {
     name: "Dragon Claw",
     description: "Slash with powerful dragon claws",
-    power: 15,
     cooldown: 2,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
   "Aqua Blast": {
     name: "Aqua Blast",
     description: "Blast your opponent with water",
-    power: 20,
+
     cooldown: 3,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
   "Healing Wave": {
     name: "Healing Wave",
     description: "Heal yourself with water energy",
-    power: -25, // healing ig
     cooldown: 4,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
   "Fire Breath": {
     name: "Fire Breath",
     description: "Breathe fire on your opponent",
-    power: 20,
     cooldown: 0,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
 
   "Tail Swipe": {
     name: "Tail Swipe",
     description: "Swipe your opponent with your tail",
-    power: 15,
     cooldown: 0,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
   "Venom Strike": {
     name: "Venom Strike",
     description: "Strike your opponent with venom",
-    power: 20,
     cooldown: 0,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
   "Web Trap": {
     name: "Web Trap",
     description: "Trap your opponent in a web",
-    power: 15,
     cooldown: 0,
+    execute: (user, target) => {
+      console.log(
+        `${user} uses Shield Bash on ${target}. ${target} is slowed!`
+      );
+    },
   },
 };
 

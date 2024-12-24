@@ -9,7 +9,7 @@ import {
   TextChannel,
 } from "discord.js";
 import abilities from "../../data/abilities";
-import { BuffDebuffLogic } from "../adv/action/buffdebufflogic";
+import { BuffDebuffLogic } from "../gamelogic/buffdebufflogic";
 import { mongoClient } from "../../data/mongo/mongo";
 
 // Type for a card's stats
@@ -35,8 +35,9 @@ interface Quest {
   timeLimit: { daysLeft: number };
   questStatus: string;
 }
+const Placeholder = Symbol("placeholder");
 
-const buffDebuffLogic = new BuffDebuffLogic();
+const buffDebuffLogic = new BuffDebuffLogic(Placeholder);
 
 // Function to get the index of the maximum value among three
 

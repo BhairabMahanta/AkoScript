@@ -1,5 +1,3 @@
-//tes
-
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -163,6 +161,10 @@ process.on("uncaughtException", (err) => {
   updateStatus(`Bot encountered an error and is shutting down: ${err.message}`)
     .then(() => process.exit(1))
     .catch(() => process.exit(1));
+});
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[UNHANDLED REJECTION]", reason);
+  // Optionally log to a file or notify the owner
 });
 
 client.on(Events.GuildCreate, () => updateStatus("Bot joined a new server."));

@@ -16,7 +16,7 @@ interface Move {
   level: number;
 }
 
-interface Stats {
+export interface Stats {
   attack: number;
   tactics: number;
   magic: number;
@@ -117,7 +117,28 @@ interface Player extends Document {
   selectedFamiliars: {
     name: SelectedFamiliar[];
   };
+  quests: string[]; // Array of quest names
+  activeQuests: {
+    [key: string]: {
+      objectives: {
+        id: string;
+        target: string;
+        description: string;
+        current: number;
+        required: number;
+      }[];
+      timeLimit: {
+        totalDays: String;
+        daysLeft: String;
+      };
+      questChannel: string;
+      questStatus: string;
+    };
+  };
+  gainExperience(exp: number): void;
+  gainItems(items: string[]): void;
 }
+
 const MoveSchema = new Schema<Move>({
   id: { type: Number, required: true },
   name: { type: String, required: true },
@@ -218,9 +239,44 @@ const playerSchema: Schema<Player> = new Schema<Player>(
         },
       ],
     },
+    quests: {
+      type: [String],
+      default: [],
+    },
+    activeQuests: {
+      type: Map,
+      of: {
+        objectives: [
+          {
+            id: String,
+            target: String,
+            description: String,
+            current: Number,
+            required: Number,
+          },
+        ],
+        timeLimit: {
+          totalDays: String,
+          daysLeft: String,
+        },
+        questChannel: String,
+        questStatus: String,
+      },
+      default: {},
+    },
   },
+
   { strict: false }
 );
+playerSchema.methods.gainExperience = function (exp: number) {
+  this.exp.xp += exp;
+  console.log(`Gained ${exp} experience. Total XP: ${this.exp.xp}`);
+};
+
+playerSchema.methods.gainItems = function (items: string[]) {
+  this.inventory.backpack.push(...items);
+  console.log(`Gained items: ${items.join(", ")}`);
+};
 
 // Create a model using the player schema
 async function playerModel(

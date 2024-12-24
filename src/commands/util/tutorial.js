@@ -8,7 +8,7 @@ import { mongoClient } from "../../data/mongo/mongo";
 const db = mongoClient.db("Akaimnky");
 const collection = db.collection("akaillection");
 const tutorialData = require("./story.json");
-const Quest = require("../adv/quest/quest.js");
+const Quest = require("../adv/quest/quest.ts");
 const firstId = tutorialData.questions.find((d) => d.id === "1");
 
 const backButton = new ButtonBuilder()

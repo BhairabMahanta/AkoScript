@@ -536,13 +536,13 @@ const allFamiliars: AllFamiliars = {
       sl: 14.1,
       name: "Fire Dragon",
       element: "Fire",
+      tier: 1,
 
       stats: {
         attack: 65,
         defense: 70,
         speed: 120,
         hp: 90,
-        tier: 1,
       },
       experience: {
         current: 0,
@@ -553,7 +553,6 @@ const allFamiliars: AllFamiliars = {
         {
           id: 27.1,
           name: "Flame Strike",
-          description: "shit",
           power: 150,
           cooldown: 3,
           level: 1,
@@ -561,7 +560,6 @@ const allFamiliars: AllFamiliars = {
         {
           id: 28.1,
           name: "Dragon Claw",
-          description: "shit2",
           power: 205,
           cooldown: 3,
           level: 1,
