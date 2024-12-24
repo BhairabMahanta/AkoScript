@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema, Model } from "mongoose";
 
 // Define interfaces for your data structure
-interface Tokens {
+export interface Tokens {
   commonScroll: number;
   rareScroll: number;
   legendaryScroll: number;
@@ -286,4 +286,4 @@ async function playerModel(
   return db.model<Player>("Player", playerSchema, collectionName);
 }
 
-export { playerModel, Stats, Player };
+export { playerModel, Player };

@@ -1,8 +1,8 @@
 import { EmbedBuilder, Message, TextChannel } from "discord.js";
-import { mongoClient } from "../../data/mongo/mongo.js"; // Adjust if needed for your TypeScript setup
+import { mongoClient } from "../../data/mongo/mongo";
 
 const db = mongoClient.db("Akaimnky");
-const collection = db.collection("akaillection");
+const collection: any = db.collection("akaillection");
 
 import { Player } from "../../data/mongo/playerschema.js";
 import { Command } from "../../@types/command.js";
@@ -17,7 +17,7 @@ const statuswindowCommand: Command = {
     args: string[]
   ): Promise<void> {
     const filter = { _id: message.author.id };
-    const player = await collection.findOne({ filter });
+    const player: Player = await collection.findOne(filter);
 
     if (!player) {
       (message.channel as TextChannel).send(

@@ -1,7 +1,7 @@
 import { Player } from "../../data/mongo/playerschema";
 import { BuffDetails, DebuffDetails } from "./buffdebufflogic";
 
-interface ExtendedPlayer extends Player {
+export interface ExtendedPlayer extends Player {
   statuses: {
     buffs: BuffDetails[];
     debuffs: DebuffDetails[];

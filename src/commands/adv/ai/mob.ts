@@ -1,7 +1,7 @@
 import { mobs } from "../../data/monsterInfo/mobs";
 import abilities from "../../../data/abilities";
 import { calculateDamage } from "../../util/glogic";
-import { Ability } from "./AbilitiesFunction";
+import { Ability } from "../../gamelogic/abilitiesFunction";
 
 interface MobDetails {
   name: string;

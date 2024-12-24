@@ -4,31 +4,20 @@ import {
   getPlayerMoves,
   critOrNot,
 } from "../util/glogic.js";
-import { BuffDebuffManager } from "./buffDebuffManager.js";
-import { BuffDebuffLogic } from "./buffdebufflogic.js";
-import abilities from "../../data/abilities.js";
+import { BuffDebuffManager, ExtendedPlayer } from "./buffDebuffManager";
+import { BuffDebuffLogic } from "./buffdebufflogic";
+import abilities from "../../data/abilities";
 import allFamiliars from "../../data/information/allfamiliars.js";
+import { Stats } from "../../data/mongo/playerschema.js";
 // import { calculateDamage } from "../../../my_rust_library/my_rust_library.node";
 // import { some } from "../../../data/locations.js";
-
-type Stats = {
-  critRate: number;
-  critDamage: number;
-  attack: number;
-  defense: number;
-  speed?: number;
-};
-
-type Character = {
-  stats: Stats;
-};
 
 type DebuffDetails = {
   name: string;
   debuffType: string;
   unique: boolean;
   value_amount: Record<string, number>;
-  targets: Character;
+  targets: ExtendedPlayer;
   turnLimit: number;
   flat: boolean;
 };
@@ -38,7 +27,7 @@ type BuffDetails = {
   buffType: string;
   unique: boolean;
   value_amount: Record<string, number>;
-  targets: Character;
+  targets: ExtendedPlayer;
   turnLimit: number;
   flat: boolean;
 };
@@ -68,7 +57,10 @@ export class Ability {
 
   // PLAYER ABILITIES
 
-  async shieldBash(user: Character, target: Character): Promise<void> {
+  async shieldBash(
+    user: ExtendedPlayer,
+    target: ExtendedPlayer
+  ): Promise<void> {
     const damage = await that2.critOrNotHandler(
       user.stats.critRate,
       user.stats.critDamage,
@@ -98,7 +90,7 @@ export class Ability {
     });
   }
 
-  async defend(user: Character): Promise<void> {
+  async defend(user: ExtendedPlayer): Promise<void> {
     const buffDetails: BuffDetails = {
       name: "Defend",
       buffType: "increase_defense",
@@ -118,7 +110,7 @@ export class Ability {
     });
   }
 
-  async bloodlust(user: Character, target: Character): Promise<void> {
+  async bloodlust(user: ExtendedPlayer, target: ExtendedPlayer): Promise<void> {
     const buffDetails: BuffDetails = {
       name: "Bloodlust",
       buffType: "increase_attack_and_increase_speed",

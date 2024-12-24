@@ -1,6 +1,6 @@
 import { bosses } from "../../data/monsterInfo/bosses";
 import abilities from "../../../data/abilities";
-import { Ability } from "./AbilitiesFunction";
+import { Ability } from "../../gamelogic/abilitiesFunction";
 import { calculateDamage } from "../../util/glogic";
 
 interface BossDetails {

@@ -34,8 +34,8 @@ interface Tier {
   [key: string]: Familiar;
 }
 
-interface AllFamiliars {
-  [tier: string]: Tier;
+export interface AllFamiliars {
+  [tier: string]: { [key: string]: any };
 }
 
 const allFamiliars: AllFamiliars = {

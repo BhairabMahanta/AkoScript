@@ -57,9 +57,9 @@ export interface BuffDetails {
   buffType: string;
   name: string;
   value_amount: {
-    attack: number;
-    speed: number;
-    defense: number;
+    attack?: number;
+    speed?: number;
+    defense?: number;
   };
   flat?: boolean;
   unique?: boolean;
@@ -71,9 +71,9 @@ export interface DebuffDetails {
   debuffType: string;
   name: string;
   value_amount: {
-    attack: number;
-    speed: number;
-    defense: number;
+    attack?: number;
+    speed?: number;
+    defense?: number;
   };
   flat?: boolean;
   unique?: boolean;
@@ -245,7 +245,9 @@ class BuffDebuffLogic {
           case "increase_attack":
             await this.increaseAttack(
               unit,
-              buffDetails.value_amount.attack,
+              buffDetails.value_amount.attack
+                ? buffDetails.value_amount.attack
+                : 0,
               flat
             );
             statChanges.push(
@@ -255,7 +257,9 @@ class BuffDebuffLogic {
           case "increase_speed":
             await this.increaseSpeed(
               unit,
-              buffDetails.value_amount.speed,
+              buffDetails.value_amount.speed
+                ? buffDetails.value_amount.speed
+                : 0,
               flat
             );
             statChanges.push(
@@ -265,7 +269,9 @@ class BuffDebuffLogic {
           case "increase_defense":
             await this.increaseDefense(
               unit,
-              buffDetails.value_amount.defense,
+              buffDetails.value_amount.defense
+                ? buffDetails.value_amount.defense
+                : 0,
               flat
             );
             statChanges.push(
@@ -275,21 +281,27 @@ class BuffDebuffLogic {
           case "decrease_attack":
             await this.decreaseAttack(
               unit,
-              buffDetails.value_amount.attack,
+              buffDetails.value_amount.attack
+                ? buffDetails.value_amount.attack
+                : 0,
               flat
             );
             break;
           case "decrease_speed":
             await this.decreaseSpeed(
               unit,
-              buffDetails.value_amount.speed,
+              buffDetails.value_amount.speed
+                ? buffDetails.value_amount.speed
+                : 0,
               flat
             );
             break;
           case "decrease_defense":
             await this.decreaseDefense(
               unit,
-              buffDetails.value_amount.defense,
+              buffDetails.value_amount.defense
+                ? buffDetails.value_amount.defense
+                : 0,
               flat
             );
             break;
@@ -322,7 +334,9 @@ class BuffDebuffLogic {
           case "decrease_attack":
             await this.decreaseAttack(
               unit,
-              debuffDetails.value_amount.attack,
+              debuffDetails.value_amount.attack
+                ? debuffDetails.value_amount.attack
+                : 0,
               flat
             );
             statChanges.push(
@@ -332,7 +346,9 @@ class BuffDebuffLogic {
           case "decrease_speed":
             await this.decreaseSpeed(
               unit,
-              debuffDetails.value_amount.speed,
+              debuffDetails.value_amount.speed
+                ? debuffDetails.value_amount.speed
+                : 0,
               flat
             );
             statChanges.push(
@@ -342,7 +358,9 @@ class BuffDebuffLogic {
           case "decrease_defense":
             await this.decreaseDefense(
               unit,
-              debuffDetails.value_amount.defense,
+              debuffDetails.value_amount.defense
+                ? debuffDetails.value_amount.defense
+                : 0,
               flat
             );
             statChanges.push(
@@ -414,13 +432,19 @@ class BuffDebuffLogic {
       };
 
       if (buff.flat) {
-        (target as Player).stats.attack += buff.attack_amount;
-        (target as Player).stats.speed += buff.speed_amount;
+        (target as Player).stats.attack += buff.attack_amount
+          ? buff.attack_amount
+          : 0;
+        (target as Player).stats.speed += buff.speed_amount
+          ? buff.speed_amount
+          : 0;
       } else {
         (target as Player).stats.attack +=
-          (target as Player).stats.attack * (buff.attack_amount / 100);
+          (target as Player).stats.attack *
+          (buff.attack_amount ? buff.attack_amount / 100 : 0 / 100);
         (target as Player).stats.speed +=
-          (target as Player).stats.speed * (buff.speed_amount / 100);
+          (target as Player).stats.speed *
+          (buff.speed_amount ? buff.speed_amount / 100 : 0 / 100);
       }
 
       this.battleLogs.push(

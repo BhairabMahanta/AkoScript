@@ -12,6 +12,8 @@ import abilities from "../../data/abilities";
 import { BuffDebuffLogic } from "../gamelogic/buffdebufflogic";
 import { mongoClient } from "../../data/mongo/mongo";
 
+import allFamiliars from "../../data/information/allfamiliars";
+
 // Type for a card's stats
 interface CardStats {
   attack: number;
@@ -231,7 +233,7 @@ async function generateHPBarEmoji(
 
 // MongoDB setup
 const db = mongoClient.db("Akaimnky");
-const collection = db.collection("akaillection");
+const collection: any = db.collection("akaillection");
 interface Objective {
   current: number | string; // You can refine this based on your actual data type
   required: number | string;
@@ -241,7 +243,8 @@ async function checkQuestCompletion(): Promise<void> {
   const currentTime = Math.floor(Date.now() / 1000);
   const playersDb = await collection.find({}).toArray();
 
-  playersDb.forEach(async (player) => {
+  playersDb.forEach(async (player: any) => {
+    //fix any later cuz times are string not number
     const playerQuests = player.activeQuests;
     let questSuccess = false;
     let questFailure = false;
@@ -252,6 +255,7 @@ async function checkQuestCompletion(): Promise<void> {
       const timeLimit = quest.timeLimit.daysLeft;
 
       if (currentTime > timeLimit) {
+        //here
         questFailure = true;
         quest.questStatus = "timeout";
         player.completedQuests[questId] = quest;
@@ -333,6 +337,65 @@ async function critOrNot(
 function capitalizeFirstLetter(string: string): string {
   if (string.length === 0) return string;
   return string.charAt(0).toUpperCase() + string.slice(1);
+}
+// Define the types for Gacha Types and Drop Rates
+export const GACHA_TYPES = {
+  COMMON_TOKEN: "commonScroll",
+  RARE_TOKEN: "rareScroll",
+  LEGENDARY_TOKEN: "legendaryScroll",
+} as const; // 'as const' ensures these values are treated as literal types
+
+// Define types for the drop rates
+export interface DropRates {
+  tier1: number;
+  tier2: number;
+  tier3: number;
+}
+
+// Define allFamiliars as an object where the keys are "Tier1", "Tier2", "Tier3"
+interface AllFamiliars {
+  [tier: string]: { [key: string]: any }; // 'any' can be replaced with the actual familiar type
+}
+
+const DROP_RATES: Record<string, DropRates> = {
+  commonScroll: { tier1: 80, tier2: 18, tier3: 2 },
+  rareScroll: { tier1: 50, tier2: 40, tier3: 10 },
+  legendaryScroll: { tier1: 20, tier2: 50, tier3: 30 },
+};
+
+export async function pullGacha(
+  playerId: string,
+  gachaType: keyof typeof GACHA_TYPES
+): Promise<any> {
+  // Get the rates from the DROP_RATES object
+  const rates = DROP_RATES[gachaType];
+
+  // Get the tier based on the rates
+  const tier = getTier(rates);
+  const tierKey = `Tier${tier}` as keyof AllFamiliars;
+
+  // Assuming allFamiliars is defined somewhere in your code
+  const characters = Object.keys(allFamiliars[tierKey]);
+
+  // Randomly select a character from the tier
+  const selectedCharacter =
+    characters[Math.floor(Math.random() * characters.length)];
+
+  // Update the player's card collection in the database
+  const filter = { _id: playerId };
+  const update = { $addToSet: { "cards.name": selectedCharacter } };
+
+  await collection.updateOne(filter, update);
+
+  // Return the selected character's data from allFamiliars
+  return allFamiliars[tierKey][selectedCharacter];
+}
+
+export function getTier(rates: DropRates): number {
+  const rand = Math.random() * 100;
+  if (rand < rates.tier1) return 1;
+  if (rand < rates.tier1 + rates.tier2) return 2;
+  return 3;
 }
 
 // Export functions for use in other files
