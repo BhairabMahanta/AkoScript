@@ -19,7 +19,7 @@ interface Experience {
   level: number;
 }
 
-interface Familiar {
+export interface Familiar {
   id: number;
   sl: number; // Assuming this stands for "slot" or similar
   name: string;

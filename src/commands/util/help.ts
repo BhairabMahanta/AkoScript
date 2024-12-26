@@ -24,6 +24,7 @@ const helpCommand: Command = {
   ): Promise<void> {
     try {
       const commands = client.commands as Map<string, Command>;
+      console.log("commands:", commands);
       const perPage = 12; // Number of commands to display per page
       let page = parseInt(args[0]) || 1; // Get the requested page from arguments
 

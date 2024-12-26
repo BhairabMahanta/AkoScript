@@ -32,7 +32,7 @@ class MobAI {
   ability: Ability;
   allies?: string[];
 
-  constructor(that: { battleLogs: string[] }, mob: MobDetails) {
+  constructor(that: any, mob: any) {
     this.name = mob.name;
     this.enemyDetails = mob;
     this.i = 0;
@@ -115,4 +115,4 @@ class MobAI {
   }
 }
 
-export default MobAI;
+export { MobAI };

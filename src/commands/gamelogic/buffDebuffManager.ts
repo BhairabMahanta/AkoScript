@@ -6,12 +6,16 @@ export interface ExtendedPlayer extends Player {
     buffs: BuffDetails[];
     debuffs: DebuffDetails[];
   };
+  attackBarEmoji: string;
+  hpBar: number;
+  atkBar: number;
+  hpBarEmoji: string;
 }
 
 class BuffDebuffManager {
   battleLogs: string[];
 
-  constructor(that: { battleLogs: string[] }) {
+  constructor(that: any) {
     this.battleLogs = that.battleLogs;
   }
 
@@ -23,11 +27,11 @@ class BuffDebuffManager {
   ): Promise<void> {
     // Special case: apply_ or remove_
     if (
-      debuffDetails.debuffType.startsWith("apply_") ||
-      debuffDetails.debuffType.startsWith("remove_")
+      debuffDetails.type.startsWith("apply_") ||
+      debuffDetails.type.startsWith("remove_")
     ) {
       const specialDebuff = {
-        debuffType: debuffDetails.debuffType,
+        debuffType: debuffDetails.type,
         name: debuffDetails.name,
         remainingTurns: debuffDetails.turnLimit,
         targets: debuffDetails.targets,
@@ -66,7 +70,7 @@ class BuffDebuffManager {
     } else {
       // Normal case: debuff application
       const debuffTemplate = {
-        debuffType: debuffDetails.debuffType,
+        type: debuffDetails.type,
         name: debuffDetails.name,
         remainingTurns: debuffDetails.turnLimit,
         value_amount: debuffDetails.value_amount,
@@ -102,7 +106,7 @@ class BuffDebuffManager {
     isTrue: boolean
   ): Promise<void> {
     target.statuses.debuffs = await target.statuses.debuffs.filter(
-      (debuff) => debuff.debuffType !== debuffType
+      (debuff) => debuff.type !== debuffType
     );
     if (isTrue) {
       this.battleLogs.push(
@@ -127,11 +131,11 @@ class BuffDebuffManager {
 
     // Special case: apply_ or remove_
     if (
-      buffDetails.buffType.startsWith("apply_") ||
-      buffDetails.buffType.startsWith("remove_")
+      buffDetails.type.startsWith("apply_") ||
+      buffDetails.type.startsWith("remove_")
     ) {
       const specialBuff = {
-        type: buffDetails.buffType,
+        type: buffDetails.type,
         name: buffDetails.name,
         remainingTurns: buffDetails.turnLimit,
         targets: buffDetails.targets,
@@ -145,8 +149,8 @@ class BuffDebuffManager {
           (buffDetails as any).value_amount[(buffDetails as any).value_name] = {
             ...(buffDetails as any).value_amount[
               (buffDetails as any).value_name
-            ], // Existing properties of invincible
-            ...specialBuff, // New properties from specialBuff
+            ],
+            ...specialBuff,
           };
           trgt.statuses.buffs.push((buffDetails as any).value_amount);
           this.battleLogs.push(
@@ -155,8 +159,8 @@ class BuffDebuffManager {
         }
       } else {
         (buffDetails as any).value_amount[(buffDetails as any).value_name] = {
-          ...(buffDetails as any).value_amount[(buffDetails as any).value_name], // Existing properties of invincible
-          ...specialBuff, // New properties from specialBuff
+          ...(buffDetails as any).value_amount[(buffDetails as any).value_name],
+          ...specialBuff,
         };
 
         user.statuses.buffs.push((buffDetails as any).value_amount);
@@ -164,7 +168,7 @@ class BuffDebuffManager {
     } else {
       // Normal case: buff application
       const buffTemplate = {
-        buffType: buffDetails.buffType,
+        type: buffDetails.type,
         name: buffDetails.name,
         remainingTurns: buffDetails.turnLimit,
         value_amount: buffDetails.value_amount,
@@ -194,7 +198,7 @@ class BuffDebuffManager {
     isTrue: boolean
   ): Promise<void> {
     target.statuses.buffs = await target.statuses.buffs.filter(
-      (buff) => buff.buffType !== buffType
+      (buff) => buff.type !== buffType
     );
     if (isTrue) {
       this.battleLogs.push(

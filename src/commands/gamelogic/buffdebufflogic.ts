@@ -54,7 +54,7 @@ export const debuffs: Record<string, Buff> = {
   },
 };
 export interface BuffDetails {
-  buffType: string;
+  type: string;
   name: string;
   value_amount: {
     attack?: number;
@@ -68,7 +68,7 @@ export interface BuffDetails {
 }
 
 export interface DebuffDetails {
-  debuffType: string;
+  type: string;
   name: string;
   value_amount: {
     attack?: number;
@@ -184,13 +184,13 @@ class BuffDebuffLogic {
   async applyWhat(
     target: Player | Player[],
     debuffDetails: {
-      debuffType: string;
+      type: string;
       flat?: boolean;
       turnLimit: number;
       name: string;
     }
   ) {
-    const debuffTypes = debuffDetails.debuffType.split("_and_");
+    const debuffTypes = debuffDetails.type.split("_and_");
     let targetNames: string[] = [];
     let statChanges: string[] = [];
 
@@ -233,7 +233,7 @@ class BuffDebuffLogic {
   }
 
   async increaseWhat(target: Player | Player[], buffDetails: BuffDetails) {
-    const buffs = buffDetails.buffType.split("_and_");
+    const buffs = buffDetails.type.split("_and_");
     let derArray: string[] = [];
     let statChanges: string[] = [];
 
@@ -322,7 +322,7 @@ class BuffDebuffLogic {
     target: ExtendedPlayer | ExtendedPlayer[],
     debuffDetails: DebuffDetails
   ) {
-    const debuffs = debuffDetails.debuffType.split("_and_");
+    const debuffs = debuffDetails.type.split("_and_");
     let derArray: string[] = [];
     let statChanges: string[] = [];
 

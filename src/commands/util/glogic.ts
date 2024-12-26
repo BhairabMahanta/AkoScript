@@ -398,6 +398,28 @@ export function getTier(rates: DropRates): number {
   return 3;
 }
 
+async function cycleCooldowns(array: Move[]): Promise<void> {
+  try {
+    if (array.length === 0) {
+      console.log("No moves on cooldown");
+      return;
+    }
+
+    array.forEach((item) => {
+      if (item.cooldown > 0) {
+        item.cooldown--;
+        if (item.cooldown === 0) {
+          console.log(`${item.name} is no longer on cooldown.`);
+          array.splice(array.indexOf(item), 1);
+          console.log("array:", array);
+        }
+      }
+    });
+  } catch (error) {
+    console.error("There isn't any moves on cooldown", error);
+  }
+}
+
 // Export functions for use in other files
 export {
   calculateDamage,
@@ -412,4 +434,5 @@ export {
   checkQuestCompletion,
   capitalizeFirstLetter,
   critOrNot,
+  cycleCooldowns,
 };

@@ -25,7 +25,7 @@ class BossAI {
   attackPattern: string[];
   ability: Ability;
 
-  constructor(that: { battleLogs?: string[] }, boss: BossDetails) {
+  constructor(that: any, boss: any) {
     this.name = boss.name;
     this.abilities = bosses[boss.name]?.abilities || {};
     this.attackPattern = bosses[boss.name]?.attackPattern || [];
@@ -61,4 +61,4 @@ class BossAI {
   }
 }
 
-export default BossAI;
+export { BossAI };

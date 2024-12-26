@@ -82,11 +82,11 @@ interface CollectionItem {
   moves: string[]; // Adjust type if needed
 }
 
-interface DeckItem {
-  slot: number;
+export interface DeckItem {
   serialId: string;
   globalId: string;
   name: string;
+  stats: Stats;
 }
 
 interface SelectedFamiliar {
