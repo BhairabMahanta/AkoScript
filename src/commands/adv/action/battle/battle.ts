@@ -21,7 +21,7 @@ import {
   BuffDebuffManager,
   ExtendedPlayer,
 } from "../../../gamelogic/buffDebuffManager";
-// import { calculateDamage } from "../../../my_rust_library/my_rust_library.node";
+const { calculateDamage } = require("../../../../../rust_lib/rust_lib.node");
 import classes from "../../../../data/classes/allclasses";
 import abilities from "../../../../data/abilities";
 import { Ability } from "../../../gamelogic/abilitiesFunction";
@@ -37,7 +37,7 @@ import {
   Message,
 } from "discord.js";
 
-interface Enemy {
+export interface Enemy {
   type: string;
   name: string;
   waves: any[];
@@ -54,14 +54,16 @@ const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     .setStyle(3),
   new ButtonBuilder().setCustomId("action_dodge").setLabel("Dodge").setStyle(3)
 );
+import { BattleEmbed } from "./sendEmbed";
+import { BattleBarManager } from "./fillBar";
 
 class Battle {
   private mobSource: typeof mobs;
   private bossSource: typeof bosses;
-  private enemyDetails: Enemy;
+  public enemyDetails: Enemy;
   private message: any;
   private continue: boolean;
-  private player: ExtendedPlayer;
+  public player: ExtendedPlayer;
   private bossAIClass: BossAI | null;
   private mobAIClass: MobAI | null;
   private mobs: any[];
@@ -69,24 +71,24 @@ class Battle {
   private backRow: any[];
   private abilityOptions: any[];
   private playerFamiliar: any[];
-  private familiarInfo: any[];
-  private mobInfo: any[];
-  private playerName: string;
+  public familiarInfo: any[];
+  public mobInfo: any[];
+  public playerName: string;
   private playerClass: any;
   private playerRace: any;
-  private boss: any;
-  private currentTurn: any;
+  public boss: any;
+  public currentTurn: any;
   private characters: any[];
   private environment: any[];
   private currentTurnIndex: number;
   private turnCounter: number;
-  private battleLogs: any[];
+  public battleLogs: any[];
   private cooldowns: any[];
   private initialMessage: any;
   private aliveFam: any[];
   private aliveEnemies: any[];
   private deadEnemies: any[];
-  private battleEmbed: any;
+  public battleEmbed: any;
   private allEnemies: any[];
   private waves: any[];
   private enemyFirst: boolean;
@@ -99,8 +101,12 @@ class Battle {
   private buffDebuffLogic: BuffDebuffLogic;
   private dodge: { option: any; id: any };
   private currentTurnId: any;
+  private taunted: Boolean;
+  private initialisedEmbed: any;
+  private barManager: BattleBarManager;
 
   constructor(player: ExtendedPlayer, enemy: Enemy, message: any) {
+    this.taunted = false;
     this.mobSource = JSON.parse(JSON.stringify(mobs));
     this.bossSource = JSON.parse(JSON.stringify(bosses));
     this.enemyDetails = enemy;
@@ -162,6 +168,8 @@ class Battle {
     this.buffDebuffManager = new BuffDebuffManager(this);
     this.buffDebuffLogic = new BuffDebuffLogic(this);
     this.dodge = { option: null, id: null };
+    this.initialisedEmbed = null;
+    this.barManager = new BattleBarManager();
   }
   async initialiseStuff(): Promise<void> {
     console.log("initialised");
@@ -260,154 +268,7 @@ class Battle {
     }
   }
 
-  async sendInitialEmbed(): Promise<EmbedBuilder | undefined> {
-    try {
-      const iconMap: Record<string, string> = {
-        increase_attack_and_speed: "🗡️💨",
-        increase_attack: "🗡️",
-        increase_defense: "🛡️",
-        increase_speed: "💨",
-        decrease_attack: "💔",
-        decrease_defense: "🌬️",
-        decrease_speed: "🍃",
-      };
-
-      console.log(this.player.name, "-inside", this.player.attackBarEmoji);
-
-      this.battleEmbed = new EmbedBuilder()
-        .setTitle(`Battle VS ${this.enemyDetails.name}`)
-        .setFooter({ text: "You can run if you want lol no issues" })
-        .setColor(0x0099ff);
-
-      if (this.battleLogs.length > 6 && this.battleLogs.length <= 7) {
-        this.battleLogs.shift();
-      } else if (this.battleLogs.length > 7 && this.battleLogs.length <= 8) {
-        this.battleLogs.shift();
-        this.battleLogs.shift();
-      } else if (this.battleLogs.length > 8) {
-        this.battleLogs.shift();
-        this.battleLogs.shift();
-        this.battleLogs.shift();
-      }
-      console.log("battleLogsLengthAfter:", this.battleLogs.length);
-
-      if (this.battleLogs.length > 0) {
-        this.battleEmbed.setDescription(
-          `**Battle Logs:**\n\`\`\`diff\n+ ${this.battleLogs.join("\n")}\`\`\``
-        );
-      } else {
-        this.battleEmbed.addFields({
-          name: "Battle Logs",
-          value: "No battle logs yet.",
-          inline: false,
-        });
-      }
-
-      this.battleEmbed.addFields({
-        name: "Current Turn",
-        value: `\`\`\`${this.currentTurn.name}\`\`\``,
-        inline: false,
-      });
-
-      if (this.enemyDetails.type === "boss") {
-        this.battleEmbed.addFields({
-          name: "Enemies Info:",
-          value: `\`\`\`ansi\n[2;31m> ${this.boss.name}\n[2;32m ${this.boss.hpBarEmoji} ${
-            this.boss.stats.hp
-          } HP\n[2;36m [2;34m${this.boss.attackBarEmoji} ${Math.floor(
-            this.boss.atkBar
-          )} AB\`\`\``,
-          inline: false,
-        });
-      } else if (this.enemyDetails.type === "mob") {
-        let mobInfo = ""; // Initialize an empty string to store the info
-        for (const mob of this.mobInfo) {
-          let buffIcons = "";
-          let debuffIcons = "";
-          for (const buff of mob.statuses.buffs) {
-            if (iconMap[buff.type]) {
-              buffIcons += iconMap[buff.type];
-            }
-          }
-          for (const buff of mob.statuses.debuffs) {
-            if (iconMap[buff.type]) {
-              debuffIcons += iconMap[buff.type];
-            }
-          }
-          mobInfo += `[2;37m ${mob.name}: ⚔️ ${mob.stats.attack} 🛡️ ${
-            mob.stats.defense
-          } 💨 ${mob.stats.speed} 🔮 ${mob.stats.magic}\n[2;32m ${mob.hpBarEmoji} ${
-            mob.stats.hp
-          } ♥️ \n[2;36m [2;34m${mob.attackBarEmoji} ${Math.floor(
-            mob.atkBar
-          )} [2;34mstts [${buffIcons}${debuffIcons}]\n\n`;
-        }
-
-        this.battleEmbed.addFields({
-          name: "Enemies Info:",
-          value: `\`\`\`ansi\n${mobInfo}\`\`\``,
-          inline: true,
-        });
-      }
-
-      if (this.player) {
-        let playerAndFamiliarsInfo = ""; // Initialize an empty string to store the info
-
-        for (const familiar of this.familiarInfo) {
-          let buffIcons = "";
-          let debuffIcons = "";
-          for (const buff of familiar.statuses.buffs) {
-            if (iconMap[buff.type]) {
-              buffIcons += iconMap[buff.type];
-            }
-          }
-          for (const buff of familiar.statuses.debuffs) {
-            if (iconMap[buff.type]) {
-              debuffIcons += iconMap[buff.type];
-            }
-          }
-          playerAndFamiliarsInfo += `[2;37m ${familiar.name}: ⚔️${
-            familiar.stats.attack
-          } 🛡️${familiar.stats.defense} 💨${familiar.stats.speed}\n[2;32m ${
-            familiar.hpBarEmoji
-          } ${familiar.stats.hp} ♥️ \n[2;36m [2;34m${familiar.attackBarEmoji} ${Math.floor(
-            familiar.atkBar
-          )} [2;34mb&d [${buffIcons}${debuffIcons}]\n\n`;
-        }
-
-        let buffIcons = "";
-        let debuffIcons = "";
-        for (const buff of this.player.statuses.buffs) {
-          if (iconMap[buff.type]) {
-            buffIcons += iconMap[buff.type];
-          }
-        }
-        for (const buff of this.player.statuses.debuffs) {
-          if (iconMap[buff.type]) {
-            debuffIcons += iconMap[buff.type];
-          }
-        }
-        playerAndFamiliarsInfo += `[2;37m ${this.playerName}: ⚔️${
-          this.player.stats.attack
-        } 🛡️${this.player.stats.defense} 💨${this.player.stats.speed} 🔮${
-          this.player.stats.magic
-        }\n[2;32m ${this.player.hpBarEmoji} ${this.player.stats.hp} ♥️ \n[2;36m [2;34m${
-          this.player.attackBarEmoji
-        } ${Math.floor(this.player.atkBar)} [2;34mb&d [${buffIcons}${debuffIcons}]`;
-
-        this.battleEmbed.addFields({
-          name: "Your Team Info:",
-          value: `\`\`\`ansi\n${playerAndFamiliarsInfo}\`\`\``,
-          inline: true,
-        });
-      }
-
-      return this.battleEmbed;
-    } catch (error) {
-      console.error("Error on hit:", error);
-    }
-  }
-
+  //
   async startEmbed(): Promise<void> {
     console.log("initialising");
     await this.initialiseStuff();
@@ -479,90 +340,11 @@ class Battle {
       }
     });
   }
-  async fillAtkBars(): Promise<ExtendedPlayer[]> {
-    let charactersWith100AtkBar: ExtendedPlayer[] = [];
-    try {
-      console.log("Starting fillAtkBars...");
-      // Sort characters by speed in descending order
-      this.characters.sort(
-        (a: ExtendedPlayer, b: ExtendedPlayer) => b.stats.speed - a.stats.speed
-      );
-      let hehetrue = false;
-      // Check if any character already has atkBar >= 100
-      for (const character of this.characters) {
-        if (character.atkBar >= 100) {
-          console.log("found atkBar >= 100 for:", character.name);
-          charactersWith100AtkBar.push(character);
-          hehetrue = true;
-          return charactersWith100AtkBar; // Exit early if any character has atkBar >= 100
-        }
-        console.log("broke bruh");
-      }
-      console.log("broken further");
-
-      // Calculate the smallestFactor for all characters
-      let smallestFactor = Infinity;
-      for (const character of this.characters) {
-        const speedMultiplier = character.speedBuff ? 1.3 : 1;
-        const toMinus = character.atkBar;
-
-        const factor =
-          (100 - toMinus) / (character.stats.speed * 0.05 * speedMultiplier);
-        console.log("factor:", factor);
-        if (factor < smallestFactor) {
-          smallestFactor = factor;
-        }
-      }
-      console.log("Calculated smallestFactor:", smallestFactor);
-
-      // Update atkBar for all characters using smallestFactor
-      for (const character of this.characters) {
-        const speedMultiplier = character.speedBuff ? 1.3 : 1;
-        character.atkBar +=
-          smallestFactor * (character.stats.speed * 0.05 * speedMultiplier);
-
-        if (character.atkBar >= 100) {
-          charactersWith100AtkBar.push(character);
-        }
-      }
-
-      // Generate attack bar emoji for each character
-      for (const character of this.characters) {
-        character.attackBarEmoji = await generateAttackBarEmoji(
-          character.atkBar
-        );
-      }
-
-      if (charactersWith100AtkBar.length > 0) {
-        console.log(
-          "Processing characters with 100 atkBar:",
-          charactersWith100AtkBar
-        );
-      }
-    } catch (error) {
-      console.log("fillBarError:", error);
-    }
-    return charactersWith100AtkBar;
-  }
-
-  async fillHpBars(): Promise<void> {
-    try {
-      console.log("Starting fillHpBars...");
-      for (const character of this.characters) {
-        const hp = await this.calculateOverallHp(character);
-        character.hpBarEmoji = await generateHPBarEmoji(
-          character.stats.hp,
-          character.maxHp
-        );
-      }
-    } catch (error) {
-      console.log("fillBarError:", error);
-    }
-  }
-
   async getNextTurn(): Promise<ExtendedPlayer | null> {
     let nextTurn: ExtendedPlayer | null = null;
-    const charactersWith100AtkBar = await this.fillAtkBars();
+    const charactersWith100AtkBar = await this.barManager.fillAtkBars(
+      this.characters
+    );
     console.log("it did reach here");
     if (charactersWith100AtkBar.length === 1) {
       const characterWith100AtkBar = charactersWith100AtkBar[0];
@@ -588,19 +370,10 @@ class Battle {
       );
     }
     console.log("hieee");
-    await this.fillHpBars();
+    await this.barManager.fillHpBars(this.characters);
     console.log("sussy");
 
     return nextTurn;
-  }
-  async calculateOverallHp(
-    character: ExtendedPlayer
-  ): Promise<number | undefined> {
-    try {
-      return character.stats.hp;
-    } catch (error) {
-      console.log("speedcalculator:", error);
-    }
   }
 
   async performTurn(): Promise<void> {
@@ -654,18 +427,18 @@ class Battle {
       return false;
 
     const dodgeOptions: { [key: string]: () => Promise<void> } = {
-      dodge_and_increase_attack_bar: () => {
+      dodge_and_increase_attack_bar: async () => {
         target.atkBar += 20;
         this.battleLogs.push(
           `- ${target.name} swiftly dodges the attack increasing 20 attack bar!!`
         );
       },
-      dodge: () => {
+      dodge: async () => {
         this.battleLogs.push(`- ${target.name} barely dodges the attack!`);
       },
       reduce_damage: async () => {
         const damage = await this.calculatePFDamage(attacker, target);
-        const reducedDamage = this.getReducedDamage(damage);
+        const reducedDamage = damage / 2;
         target.stats.hp -= reducedDamage;
         this.battleLogs.push(
           `- ${attacker.name} attacks ${
@@ -684,7 +457,7 @@ class Battle {
       },
       take_15x_damage: async () => {
         const damage = await this.calculatePFDamage(attacker, target);
-        const increasedDamage = this.getIncreasedDamage(damage);
+        const increasedDamage = damage * 2;
         target.stats.hp -= increasedDamage + damage;
         this.battleLogs.push(
           `+ ${attacker.name} attacks ${target.name} for ${damage} damage and ${increasedDamage}. ${target.name} slipped and fell while trying to dodge!`
@@ -744,7 +517,7 @@ class Battle {
         },
       },
       taunt: {
-        apply: (target) => {
+        apply: (target: any) => {
           this.taunted = true;
           const targetted = target.statuses.debuffs["taunt"].target;
           this.battleLogs.push(
@@ -765,7 +538,7 @@ class Battle {
     if (!statuses || Object.keys(statuses).length === 0) {
       return false; // No status effects to handle
     }
-    for (const status of Object.values(statuses)) {
+    for (const status of Object.values(statuses) as any) {
       for (const [effect, { apply }] of Object.entries(statusEffects)) {
         console.log("status:", status, "effect:", effect);
         if (status[effect] && apply(target)) {
@@ -1144,20 +917,21 @@ class Battle {
       this.message.channel.send("You lost, skill issue.");
       this.player.stats.speed = 0;
     } else {
-      updatedEmbed = await this.sendInitialEmbed();
+      updatedEmbed = await this.initialisedEmbed.sendInitialEmbed();
       this.initialMessage.edit({
         embeds: [updatedEmbed],
         components: await this.getDuelActionRow(),
       });
     }
   }
-  async startBattle(message: Message): Promise<void> {
+  async startBattle(message: any): Promise<void> {
     console.log("startBattle");
 
     await this.getNextTurn();
+    this.initialisedEmbed = new BattleEmbed(this);
     console.log("currentTurn:", this.currentTurn.name);
 
-    this.initialMessage = await this.sendInitialEmbed();
+    this.initialMessage = await this.initialisedEmbed.sendInitialEmbed();
     console.log("initialMessage:", this.initialMessage);
 
     this.initialMessage = await (message.channel as TextChannel).send({
@@ -1168,7 +942,7 @@ class Battle {
 
     if (this.enemyFirst) {
       this.printBattleResult();
-      const updatedEmbed = await this.sendInitialEmbed();
+      const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed();
       await this.initialMessage.edit({
         embeds: [updatedEmbed],
         components: await this.getDuelActionRow(),
@@ -1176,7 +950,7 @@ class Battle {
     }
 
     const filter = (i: any) =>
-      (i.user.id === message.author.id && i.customId.startsWith("action_")) ||
+      (i.user.id === message.user.id && i.customId.startsWith("action_")) ||
       i.customId === "starter";
 
     const collector = this.initialMessage.createMessageComponentCollector({
@@ -1290,7 +1064,8 @@ class Battle {
                 await this.performEnemyTurn();
 
                 this.printBattleResult();
-                const updatedEmbed = await this.sendInitialEmbed();
+                const updatedEmbed =
+                  await this.initialisedEmbed.sendInitialEmbed();
               } else {
                 console.log(`Ability ${abilityName} not found.`);
               }
