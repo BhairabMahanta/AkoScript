@@ -20,17 +20,6 @@ import { Player } from "../../../data/mongo/playerschema";
 const db = mongoClient.db("Akaimnky");
 const collection = db.collection("akaillection");
 
-// Types
-
-interface ThatObject {
-  player: Player;
-  embed: EmbedBuilder;
-  row: ActionRowBuilder<ButtonBuilder>[];
-  message: string;
-  collectorMessage: any; // Add proper type if possible
-  yesNoButton: boolean;
-  questName: string;
-}
 const placeholder = "placeholder";
 const mockMessage = createMockMessage("This is a mock message.");
 export class Quest {
@@ -46,10 +35,10 @@ export class Quest {
   private collectorMessage: any;
   private yesNoButton: boolean;
 
-  constructor(that: ThatObject) {
+  constructor(that: any) {
     this.player = that.player;
     this.playerId = that.player._id;
-    this.filter = { _id: new ObjectId(that.player._id) };
+    this.filter = { _id: that.player._id };
     this.questName = that.questName;
     this.questDetails = null;
     this.questLogic = new QuestLogic(
