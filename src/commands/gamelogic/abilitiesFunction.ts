@@ -38,8 +38,8 @@ export class Ability {
   private battleLogs: any;
   private enemyToHit: any;
   private cooldowns: { name: string; cooldown: Promise<number> }[];
-  private buffDebuffManager: BuffDebuffManager;
-  private buffDebuffLogic: BuffDebuffLogic;
+  private buffDebuffManager: any;
+  private buffDebuffLogic: any;
 
   constructor(that: any) {
     that2 = that;

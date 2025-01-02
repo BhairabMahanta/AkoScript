@@ -172,7 +172,7 @@ const deckCommand: Command = {
             const playerSlot = {
               serialId: "player",
               globalId: i.user.id,
-              name: i.user.username,
+              name: playerData.name,
               stats: extraPlayerDataNonUpdating.stats,
             };
             playerData.deck.push(playerSlot);

@@ -1,21 +1,30 @@
-export interface Stats {
-  hp: number;
-  attack: number;
-  defense: number;
-  speed: number;
-  magic?: number; // Optional, since not all mobs may have magic stats
+import { Boss } from "./bosses";
+import { Mob, Stats } from "./mobs";
+
+// Define BossStats interface, extending Stats for additional properties like mana
+export interface BossStats extends Stats {
+  mana: number;
 }
 
-export interface Mob {
-  name: string;
-  stats: Stats;
-  abilities: string[];
-  attackPattern: string[];
-  index: number;
+// Define Mob interface, using Stats for the mob stats
+export interface MobEnemy extends Mob {
+  type: "mob";
 }
 
-export const mobs: Record<string, Mob> = {
-  monsterA: {
+// Define Boss interface, using BossStats for the boss stats
+export interface BossEnemy extends Boss {
+  type: "boss";
+  ofScenario: string;
+}
+
+// Define a type for all possible enemies, which can either be a Mob or Boss
+export type Enemy = MobEnemy | BossEnemy;
+
+// Create an array that contains all enemies, with each object having a type to distinguish Mob from Boss
+export const allEnemies: Enemy[] = [
+  // Mobs
+  {
+    type: "mob",
     name: "monsterA",
     stats: {
       hp: 1000,
@@ -28,7 +37,8 @@ export const mobs: Record<string, Mob> = {
     attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe", "Fire Breath"],
     index: 0,
   },
-  monsterB: {
+  {
+    type: "mob",
     name: "monsterB",
     stats: {
       hp: 800,
@@ -39,9 +49,10 @@ export const mobs: Record<string, Mob> = {
     },
     abilities: ["Venom Strike", "Web Trap"],
     attackPattern: ["Basic Attack", "Venom Strike", "Web Trap", "Venom Strike"],
-    index: 0,
+    index: 1,
   },
-  Goblin: {
+  {
+    type: "mob",
     name: "Goblin",
     stats: {
       hp: 1000,
@@ -52,9 +63,10 @@ export const mobs: Record<string, Mob> = {
     },
     abilities: ["Fire Breath", "Tail Swipe"],
     attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe", "Fire Breath"],
-    index: 0,
+    index: 2,
   },
-  Wolf: {
+  {
+    type: "mob",
     name: "Wolf",
     stats: {
       hp: 1000,
@@ -65,9 +77,10 @@ export const mobs: Record<string, Mob> = {
     },
     abilities: ["Fire Breath", "Tail Swipe"],
     attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe", "Fire Breath"],
-    index: 0,
+    index: 3,
   },
-  Treant: {
+  {
+    type: "mob",
     name: "Treant",
     stats: {
       hp: 1000,
@@ -78,9 +91,10 @@ export const mobs: Record<string, Mob> = {
     },
     abilities: ["Fire Breath", "Tail Swipe"],
     attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe", "Fire Breath"],
-    index: 0,
+    index: 4,
   },
-  Fire_Imp: {
+  {
+    type: "mob",
     name: "Fire Imp",
     stats: {
       hp: 1000,
@@ -91,9 +105,10 @@ export const mobs: Record<string, Mob> = {
     },
     abilities: ["Fire Breath", "Tail Swipe"],
     attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe", "Fire Breath"],
-    index: 0,
+    index: 5,
   },
-  Lava_Beast: {
+  {
+    type: "mob",
     name: "Lava Beast",
     stats: {
       hp: 1000,
@@ -104,7 +119,38 @@ export const mobs: Record<string, Mob> = {
     },
     abilities: ["Fire Breath", "Tail Swipe"],
     attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe", "Fire Breath"],
+    index: 6,
+  },
+  // Bosses
+  {
+    type: "boss",
+    name: "Dragon Lord",
+    ofScenario: "volcano-region",
+    stats: {
+      hp: 1000,
+      attack: 150,
+      defense: 100,
+      speed: 80,
+      mana: 200,
+    },
+    abilities: ["Fire Breath", "Tail Swipe"],
+    attackPattern: ["Basic Attack", "Fire Breath", "Tail Swipe"],
     index: 0,
   },
-  // Add more mobs as needed
-};
+  {
+    type: "boss",
+    name: "Giant Spider",
+    ofScenario: "forest-region",
+    stats: {
+      hp: 800,
+      attack: 120,
+      defense: 80,
+      speed: 120,
+      mana: 100,
+    },
+    abilities: ["Venom Strike", "Web Trap"],
+    attackPattern: ["Basic Attack", "Venom Strike", "Web Trap"],
+    index: 1,
+  },
+  // Add other bosses as needed
+];

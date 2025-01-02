@@ -13,7 +13,11 @@ import { BuffDebuffLogic } from "../gamelogic/buffdebufflogic";
 import { mongoClient } from "../../data/mongo/mongo";
 
 import allFamiliars from "../../data/information/allfamiliars";
-
+const {
+  calculateDamage,
+  calculateCritDamage,
+  calculateAbilityDamage,
+} = require("../../../rust_lib/rust_lib.node");
 // Type for a card's stats
 interface CardStats {
   attack: number;
@@ -46,48 +50,6 @@ const buffDebuffLogic = new BuffDebuffLogic(Placeholder);
 // Define base stats
 const baseAttack = 50;
 const baseDefense = 50;
-
-// Function to calculate damage
-// TypeScript equivalent functions
-function calculateDamage(authorAtk: number, opponentDefense: number): number {
-  const damage = Math.floor(
-    Math.sqrt(authorAtk) **
-      (Math.sqrt(3) **
-        ((850 + authorAtk) / (450 + 1.26 * opponentDefense) ** 0.5))
-  );
-
-  return damage;
-}
-
-function calculateCritDamage(
-  authorAtk: number,
-  authorCritDamage: number,
-  opponentDefense: number
-): number {
-  const damage = Math.floor(
-    Math.sqrt(authorAtk * 1.5 ** ((authorCritDamage + 50) / 100)) **
-      (Math.sqrt(3) **
-        ((850 + authorAtk) / (450 + 1.26 * opponentDefense) ** 0.5))
-  );
-
-  return damage;
-}
-
-function calculateAbilityDamage(
-  authorAtk: number,
-  authorCritDamage: number,
-  opponentDefense: number,
-  authorAbilityPower: number
-): number {
-  const damage =
-    Math.floor(
-      Math.sqrt(authorAtk * 1.5 ** ((authorCritDamage + 50) / 100)) **
-        (Math.sqrt(3) **
-          ((850 + authorAtk) / (450 + 1.26 * opponentDefense) ** 0.5)) *
-        authorAbilityPower
-    ) / 100;
-  return damage;
-}
 
 function calculateDamageOld(
   authorAttack: number,
