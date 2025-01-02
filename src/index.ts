@@ -111,7 +111,37 @@ client.on("ready", async () => {
   client.db = db;
 });
 
-setInterval(checkQuestCompletion, 1000 * 60);
+setInterval(checkQuestCompletion, 10000 * 60);
+
+process.on("SIGINT", () => {
+  updateStatus("Bot is restarting...")
+    .then(() => process.exit())
+    .catch((err) => {
+      console.error("Error sending status update on restart:", err);
+      process.exit();
+    });
+});
+
+process.on("uncaughtException", async (err) => {
+  console.error("[UNCAUGHT EXCEPTION]", err);
+  try {
+    await updateStatus(
+      `Bot encountered an error and is shutting down: ${err.message}`
+    );
+  } catch (updateErr) {
+    console.error("[ERROR] Failed to send shutdown status:", updateErr);
+  } finally {
+    process.exit(1); // Exit with failure status
+  }
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[UNHANDLED REJECTION]", reason);
+  // Optionally log to a file or notify the owner
+});
+
+client.on(Events.GuildCreate, () => updateStatus("Bot joined a new server."));
+client.on(Events.GuildDelete, () => updateStatus("Bot left a server."));
 
 async function updateStatus(message: string) {
   if (!client.user) {
@@ -147,29 +177,6 @@ async function updateStatus(message: string) {
     console.error("Error updating status:", error);
   }
 }
-
-process.on("SIGINT", () => {
-  updateStatus("Bot is restarting...")
-    .then(() => process.exit())
-    .catch((err) => {
-      console.error("Error sending status update on restart:", err);
-      process.exit();
-    });
-});
-
-process.on("uncaughtException", (err) => {
-  updateStatus(`Bot encountered an error and is shutting down: ${err.message}`)
-    .then(() => process.exit(1))
-    .catch(() => process.exit(1));
-});
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[UNHANDLED REJECTION]", reason);
-  // Optionally log to a file or notify the owner
-});
-
-client.on(Events.GuildCreate, () => updateStatus("Bot joined a new server."));
-client.on(Events.GuildDelete, () => updateStatus("Bot left a server."));
-
 client.login(process.env.TOKEN);
 
 // Export client if necessary

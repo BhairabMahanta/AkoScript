@@ -16,11 +16,6 @@ import path from "path";
 import { DeactivatedElement } from "../../../../data/mongo/elementSchema";
 
 import { ExtendedPlayer } from "../../../gamelogic/buffDebuffManager";
-// import {
-//   calculateDamage,
-//   calculateCritDamage,
-//   calculateAbilityDamage,
-// } from "../../../my_rust_library/my_rust_library.node";
 
 interface Element {
   name: string;
@@ -55,9 +50,9 @@ class GameImage {
   private distanceToNpc: number = 0;
   private distanceToMonster: number = 0;
   private whichMon: any = null;
-  private playerpos: { x: number; y: number };
+  public playerpos: { x: number; y: number };
   private isTrue: boolean = false;
-  private elementArray: any[] = [];
+  public elementArray: any[] = [];
 
   constructor(
     imgH: number,
@@ -106,7 +101,7 @@ class GameImage {
   }
 
   async generateUpdatedImage(
-    areaImage: string,
+    areaImage: any,
     playerpos: { x: number; y: number }
   ): Promise<AttachmentBuilder | void> {
     let name: string;
@@ -120,14 +115,14 @@ class GameImage {
 
         for (const element of this.elements) {
           const elementName = element.name;
-          name = `commands/adv/npcimg/${elementName}.png`;
+          name = `src/commands/data/npcimg/${elementName}.png`;
 
           if (fs.existsSync(name)) {
             inputImagePath = name;
           } else {
             inputImagePath = element.name.startsWith("monster")
-              ? "commands/adv/npcimg/monster.png"
-              : "commands/adv/npcimg/npc.png";
+              ? "src/commands/data/npcimg/monster.png"
+              : "src/commands/data/npcimg/npc.png";
           }
 
           if (element === this.elements[0]) {
@@ -151,7 +146,7 @@ class GameImage {
       this.gaeImage = await sharp(this.image ? this.image : "null")
         .composite([
           {
-            input: "commands/adv/npcimg/Old_man.png",
+            input: "src/commands/data/npcimg/Old_man.png",
             left: playerpos.x,
             top: playerpos.y,
           },
@@ -173,10 +168,11 @@ class GameImage {
     // Load the base image
 
     // Other properties of the player...
+    console.log("this.playerpos:", this.playerpos);
     const updatedImageBuffer = await sharp(this.image ? this.image : "null")
       .composite([
         {
-          input: "commands/adv/npcimg/Old_man.png",
+          input: "src/commands/adv/npcimg/Old_man.png",
           left: this.playerpos.x,
           top: this.playerpos.y,
         },
@@ -198,7 +194,6 @@ class GameImage {
     });
   }
 
-  // Near Element Method
   async nearElement(
     hasAttackButton: boolean,
     message: any,
