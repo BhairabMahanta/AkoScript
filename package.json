@@ -13,9 +13,11 @@
   "dependencies": {
     "@napi-rs/canvas": "^0.1.65",
     "@napi-rs/canvas-win32-x64-msvc": "^0.1.65",
+    "@napi-rs/cli": "^2.18.4",
     "@types/jsonfile": "^6.1.4",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^22.7.5",
+    "cargo": "^0.8.0",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
     "mongodb": "^6.9.0",
