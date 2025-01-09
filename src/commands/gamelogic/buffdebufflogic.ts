@@ -97,17 +97,20 @@ class BuffDebuffLogic {
     i: number,
     what: boolean
   ) {
-    const types = buff.effect.split("_and_");
+    let types: any;
+    if (buff.type.includes("_and_")) types = buff.type.split("_and_");
+    else types = [buff.type];
     types.forEach((type: String) => {
       if (type.startsWith("increase_") || type.startsWith("decrease_")) {
         const attribute = type.split("_")[1];
         console.log("type:", type);
-        if (buff.effect === "flat") {
-          turnEnder.stats[attribute as keyof Stats] -= buff[attribute];
+        if (buff.flat) {
+          turnEnder.stats[attribute as keyof Stats] -=
+            buff.value_amount[attribute];
         } else {
           turnEnder.stats[attribute as keyof Stats] -=
             (turnEnder.stats[attribute as keyof Stats] *
-              (buff.effect as unknown as number)) /
+              (buff.value_amount as unknown as number)) /
             100;
         }
       }
