@@ -15,7 +15,11 @@ import { Command } from "../../../@types/command";
 
 const db = mongoClient.db("Akaimnky");
 const collection: any = db.collection("akaillection");
-import { DeckItem, Player } from "../../../data/mongo/playerschema";
+import {
+  DeckItem,
+  DungeonDeckItem,
+  Player,
+} from "../../../data/mongo/playerschema";
 import { Familiar } from "../../../data/information/allfamiliars";
 
 import { ExtendedClient } from "../../../index";
@@ -38,7 +42,28 @@ const deckCommand: Command = {
       );
     }
     let deckEmbed: any;
-    const empty: any = { name: "empty" };
+    const empty: DungeonDeckItem = {
+      name: "empty",
+      serialId: "69420haha",
+      globalId: "69420haha",
+      stats: {
+        attack: 0,
+        tactics: 0,
+        magic: 0,
+        training: 0,
+        defense: 0,
+        magicDefense: 0,
+        speed: 0,
+        hp: 0,
+        intelligence: 0,
+        critRate: 0,
+        critDamage: 0,
+        wise: 0,
+        luck: 0,
+        devotion: 0,
+        potential: 0,
+      },
+    };
     const formattedDescription = playerData.deck.map((item, index) => {
       const name = item?.name != "empty" ? `(${item.name})` : "__empty__";
       const serialId = item?.serialId || "e";
@@ -114,7 +139,7 @@ const deckCommand: Command = {
           await (message.channel as any).send("Deck configuration saved!");
           collector.stop();
         } else if (i.customId === "reset") {
-          playerData.deck = Array(6).fill(empty);
+          playerData.dungeonDeck = Array(6).fill(empty);
           await collection.updateOne(filter, {
             $set: { deck: playerData.deck },
           });
@@ -166,7 +191,7 @@ const deckCommand: Command = {
             if (!extraPlayerDataNonUpdating) return;
 
             // Ensure playerData.deck is reset
-            playerData.deck = [];
+            playerData.dungeonDeck = [];
 
             // Always include the player
             const playerSlot = {
