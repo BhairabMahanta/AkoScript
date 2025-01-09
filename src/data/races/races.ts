@@ -11,6 +11,8 @@ interface Stats {
   defense: number;
   magic: number;
   speed: number;
+  magicDefense: number;
+  divinePower: number;
 }
 
 interface SpAllocation {
@@ -29,13 +31,22 @@ const races: { [key: string]: Race } = {
       defense: 60,
       magic: 60,
       speed: 65,
+      magicDefense: 60,
+      divinePower: 5,
     },
     abilities: ["Adaptable Nature", "Versatile Training"],
     description:
-      "Versatile and adaptable, humans possess a balanced set of abilities.",
+      "Versatile and adaptable, humans possess a balanced set of abilities. Good allrounder prospect",
     spAllocation: {
-      staticNum: 4,
-      static: ["hp", "attack", "defense", "magic"], // All stats for balance
+      staticNum: 6,
+      static: [
+        "hp",
+        "attack",
+        "defense",
+        "magic",
+        "magicDefense",
+        "divinePower",
+      ], // All stats for balance
       dynamic: {
         hp: 1,
         attack: 1,
@@ -51,13 +62,22 @@ const races: { [key: string]: Race } = {
       defense: 45,
       magic: 85,
       speed: 95,
+      magicDefense: 70,
+      divinePower: 10,
     },
     abilities: ["Elven Grace", "Nature's Favor"],
     description:
-      "Graceful and attuned to nature, elves excel in agility and magical prowess.",
+      "Graceful and attuned to nature, elves excel in agility and magical prowess. Good healer prospect",
     spAllocation: {
-      staticNum: 2,
-      static: ["magic", "speed"], // Focus on magic and speed
+      staticNum: 6,
+      static: [
+        "hp",
+        "attack",
+        "defense",
+        "magic",
+        "magicDefense",
+        "divinePower",
+      ], // All stats for balance
       dynamic: {
         hp: 1,
         attack: 1,
@@ -69,17 +89,26 @@ const races: { [key: string]: Race } = {
   GiantKin: {
     stats: {
       hp: 2500,
-      attack: 75,
+      attack: 55,
       defense: 80,
       magic: 25,
+      magicDefense: 50,
+      divinePower: 5,
       speed: 40,
     },
     abilities: ["Colossal Strength", "Unyielding Will"],
     description:
-      "Massive and powerful, GiantKin dominate battles with brute force.",
+      "Massive and powerful, GiantKin dominate battles with brute force. Good Tank prospect",
     spAllocation: {
-      staticNum: 3,
-      static: ["hp", "attack", "defense"], // Focus on strength-based stats
+      staticNum: 6,
+      static: [
+        "hp",
+        "attack",
+        "defense",
+        "magic",
+        "magicDefense",
+        "divinePower",
+      ], // All stats for balance
       dynamic: {
         hp: 1,
         attack: 1,
@@ -88,20 +117,29 @@ const races: { [key: string]: Race } = {
       }, // Balanced dynamic allocation
     },
   },
-  Halfling: {
+  Shadeborn: {
     stats: {
       hp: 1400,
       attack: 60,
       defense: 70,
       magic: 40,
       speed: 90,
+      magicDefense: 60,
+      divinePower: 5,
     },
     abilities: ["Sneaky Tricks", "Lucky Charm"],
     description:
-      "Small and nimble, halflings are expert thieves and stealthy adventurers.",
+      "Evoking beings born from the shadows, mysterious and stealthy. Good assassin prospect",
     spAllocation: {
-      staticNum: 2,
-      static: ["speed", "defense"], // Focus on speed and defense
+      staticNum: 6,
+      static: [
+        "hp",
+        "attack",
+        "defense",
+        "magic",
+        "magicDefense",
+        "divinePower",
+      ], // All stats for balance
       dynamic: {
         hp: 1,
         attack: 1,
@@ -110,14 +148,20 @@ const races: { [key: string]: Race } = {
       }, // Balanced dynamic allocation
     },
   },
-
-  Gnome: {
+  Dwarf: {
     abilities: ["Arcane Brilliance", "Inventive Mind"],
     description:
-      "Intelligent and inventive, gnomes excel in arcane magic and technological innovations.",
+      "Resilient and sturdy, dwarves are skilled craftsmen and formidable warriors.",
     spAllocation: {
-      staticNum: 3,
-      static: ["hp", "attack", "defense"], // Focus on strength-based stats
+      staticNum: 6,
+      static: [
+        "hp",
+        "attack",
+        "defense",
+        "magic",
+        "magicDefense",
+        "divinePower",
+      ], // All stats for balance
       dynamic: {
         hp: 1,
         attack: 1,
@@ -126,11 +170,13 @@ const races: { [key: string]: Race } = {
       }, // Balanced dynamic allocation
     },
     stats: {
-      hp: 1400,
-      attack: 60,
-      defense: 70,
+      hp: 2400,
+      attack: 55,
+      defense: 65,
       magic: 40,
-      speed: 90,
+      speed: 60,
+      magicDefense: 60,
+      divinePower: 5,
     },
   },
 };

@@ -138,24 +138,17 @@ const registerCommand: Command = {
       },
       stats: {
         attack: 100,
-        tactics: 0,
-        magic: 1,
-        training: 0,
+        magic: 100,
         defense: 100,
-        magicDefense: 0,
+        magicDefense: 90,
         speed: 110,
+        evolution: 1,
         hp: 2000,
-        intelligence: 1,
-        wise: 1,
         luck: 1,
-        devotion: 0,
+        divinePower: 0,
         potential: 1,
-        critRate:
-          randomCardStats.critRate !== undefined ? randomCardStats.critRate : 0,
-        critDamage:
-          randomCardStats.critDamage !== undefined
-            ? randomCardStats.critDamage
-            : 0,
+        critRate: 15,
+        critDamage: 50,
       },
       balance: { coins: 0, gems: 0 },
       exp: { xp: 0, level: 0 },
@@ -192,6 +185,7 @@ const registerCommand: Command = {
                 : 0, // Set default if undefined
             magic: randomCardStats.magic || 0,
             magicDefense: randomCardStats.magicDefense || 0,
+            divinePower: randomCardStats.divinePower || 0,
           },
           ability: randomCardData.card.ability,
           moves: randomCardMoves,

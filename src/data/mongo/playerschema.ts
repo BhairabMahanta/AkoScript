@@ -18,19 +18,15 @@ interface Move {
 
 export interface Stats {
   attack: number;
-  tactics: number;
   magic: number;
-  training: number;
   defense: number;
   magicDefense: number;
   speed: number;
   hp: number;
-  intelligence: number;
+  divinePower: number;
   critRate: number;
   critDamage: number;
-  wise: number;
   luck: number;
-  devotion: number;
   potential: number;
 }
 
@@ -174,19 +170,15 @@ const playerSchema: Schema<Player> = new Schema<Player>(
     },
     stats: {
       attack: { type: Number, required: true },
-      tactics: { type: Number, required: true },
       magic: { type: Number, required: true },
-      training: { type: Number, required: true },
       defense: { type: Number, required: true },
       magicDefense: { type: Number, required: true },
       speed: { type: Number, required: true },
       hp: { type: Number, required: true },
-      intelligence: { type: Number, required: true },
       critRate: { type: Number, required: true },
       critDamage: { type: Number, required: true },
-      wise: { type: Number, required: true },
       luck: { type: Number, required: true },
-      devotion: { type: Number, required: true },
+      divinePower: { type: Number, required: true },
       potential: { type: Number, required: true },
     },
     balance: {
@@ -229,6 +221,7 @@ const playerSchema: Schema<Player> = new Schema<Player>(
           critDamage: { type: Number, required: true },
           magic: { type: Number, required: true },
           magicDefense: { type: Number, required: true },
+          divinePower: { type: Number, required: true },
         },
         moves: [MoveSchema],
       },

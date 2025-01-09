@@ -49,6 +49,9 @@ const selectRow2 = new ActionRowBuilder().addComponents(
   selectButton2 // Add the new "Select" button
 );
 import { ExtendedClient } from "../../../index";
+
+import { handleRaceSelection2, handleSelectRace } from "./raceClick";
+import { handleSelectClass } from "./classClick";
 const selectAllCommand: Command = {
   name: "selectAll",
   description: "Select your race, class, and up to 3 familiars!",
@@ -116,19 +119,19 @@ const selectAllCommand: Command = {
       globalId: "69420haha",
       stats: {
         attack: 0,
-        tactics: 0,
+
         magic: 0,
-        training: 0,
+
         defense: 0,
         magicDefense: 0,
         speed: 0,
         hp: 0,
-        intelligence: 0,
+
         critRate: 0,
         critDamage: 0,
-        wise: 0,
+
         luck: 0,
-        devotion: 0,
+        divinePower: 0,
         potential: 0,
       },
     };
@@ -208,17 +211,16 @@ const selectAllCommand: Command = {
     collector.on("collect", async (i: any) => {
       try {
         await i.deferUpdate();
-        let abilityOne: string;
-        let abilityTwo: string;
+
         console.log("Interaction custom ID:", i.customId);
         let updateEmbed: EmbedBuilder;
 
         if (i.customId === "initial_select") {
           const selectedOption = i.values[0];
           if (selectedOption === "select_race") {
-            await handleSelectRace(i, sentMessage);
+            await handleSelectRace(i, sentMessage, raceOptions, raceRow);
           } else if (selectedOption === "select_class") {
-            await handleSelectClass(i, sentMessage);
+            await handleSelectClass(i, sentMessage, classRow);
           } else if (selectedOption === "select_familiar") {
             await handleSelectFamiliar(i, sentMessage);
           } else if (selectedOption === "select_deck") {
@@ -379,46 +381,15 @@ const selectAllCommand: Command = {
           }
         } else if (i.customId.startsWith("race_select")) {
           selectedRaceValue = i.values[0];
-          console.log(
-            "Selected race value from race_select:",
-            selectedRaceValue
+          await handleRaceSelection2(
+            i,
+            racesData,
+            abilitiesData,
+            sentMessage,
+            selectRow,
+            raceRow,
+            initialRow
           );
-          if (selectedRaceValue.startsWith("race-")) {
-            const raceName = selectedRaceValue.replace("race-", "");
-            console.log("Race name:", raceName);
-            console.log("Race description:", racesData[raceName]?.description);
-            const raceFields = {
-              name: `Race: ${raceName}`,
-              value:
-                racesData[raceName]?.description || "Description not available",
-              inline: false,
-            };
-
-            abilityOne = racesData[raceName]?.abilities[0];
-            abilityTwo = racesData[raceName]?.abilities[1];
-            const abilityDescFieldOne = {
-              name: `${racesData[raceName]?.abilities[0]}:`,
-              value:
-                abilitiesData[abilityOne]?.description || "weak, no ability",
-              inline: false,
-            };
-            const abilityDescFieldTwo = {
-              name: `${racesData[raceName]?.abilities[1]}:`,
-              value:
-                abilitiesData[abilityTwo]?.description || "weak, no ability",
-              inline: false,
-            };
-            updateEmbed = new EmbedBuilder()
-              .setTitle(`Pick ${raceName} Race?`)
-              .setDescription(
-                "Use the buttons to navigate through the options."
-              )
-              .addFields(raceFields, abilityDescFieldOne, abilityDescFieldTwo);
-            await sentMessage.edit({
-              embeds: [updateEmbed],
-              components: [selectRow, raceRow, initialRow],
-            });
-          }
         } else if (i.customId === "select_race_button") {
           if (selectedRaceValue.startsWith("race-")) {
             const raceName = selectedRaceValue.replace("race-", "");
@@ -463,83 +434,6 @@ const selectAllCommand: Command = {
         );
       }
     });
-
-    async function handleSelectRace(
-      interaction: Interaction,
-      sentMessage: Message
-    ): Promise<void> {
-      const raceFields = raceOptions.map((raceOption) => {
-        const raceName = raceOption.value.replace("race-", "");
-        return {
-          name: `Race: ${raceName}`,
-          value:
-            racesData[raceName]?.description || "Description not available",
-          inline: false,
-        };
-      });
-
-      const switchSelectMenu = new StringSelectMenuBuilder()
-        .setCustomId("initial_select")
-        .setPlaceholder("Switch to another selection")
-        .addOptions([
-          { label: "Select Class", value: "select_class" },
-          { label: "Select Familiar", value: "select_familiar" },
-        ]);
-
-      const switchRow: any = new ActionRowBuilder().addComponents(
-        switchSelectMenu
-      );
-
-      const raceEmbed = new EmbedBuilder()
-        .setTitle("Pick a Race to advance forward!")
-        .setDescription("Use the buttons to navigate through the options.")
-        .addFields(...raceFields);
-
-      await sentMessage.edit({
-        embeds: [raceEmbed],
-        components: [raceRow, switchRow],
-      });
-    }
-
-    async function handleSelectClass(
-      interaction: Interaction,
-      sentMessage: Message
-    ): Promise<void> {
-      const classOptions = Object.keys(classesData).map((className) => ({
-        label: className,
-        value: `class-${className}`,
-      }));
-
-      const classFields = classOptions.map((classOption) => {
-        const className = classOption.value.replace("class-", "");
-        return {
-          name: `Class: ${className}`,
-          value:
-            classesData[className]?.description || "Description not available",
-          inline: false,
-        };
-      });
-
-      const switchSelectMenu = new StringSelectMenuBuilder()
-        .setCustomId("initial_select")
-        .setPlaceholder("Switch to another selection")
-        .addOptions([
-          { label: "Select Race", value: "select_race" },
-          { label: "Select Familiar", value: "select_familiar" },
-        ]);
-
-      const switchRow = new ActionRowBuilder().addComponents(switchSelectMenu);
-
-      const classEmbed = new EmbedBuilder()
-        .setTitle("Select Your Class")
-        .setDescription("Use the buttons to navigate through the options.")
-        .addFields(...classFields);
-
-      await sentMessage.edit({
-        embeds: [classEmbed],
-        components: [classRow, switchRow],
-      });
-    }
 
     async function handleSelectFamiliar(
       interaction: Interaction,
@@ -858,10 +752,33 @@ const selectAllCommand: Command = {
     });
 
     async function updateRace(status: string, raceName: string) {
+      const raceStats = racesData[raceName]?.stats;
+
+      if (!raceStats) {
+        console.error("Invalid race name:", raceName);
+        return;
+      }
+
       await collection.updateOne(
         { _id: message.author.id },
         {
-          $set: { race: raceName, raceStatus: status },
+          $set: {
+            race: raceName,
+            raceStatus: status,
+            stats: {
+              attack: raceStats.attack,
+              magic: raceStats.magic,
+              defense: raceStats.defense,
+              magicDefense: raceStats.magicDefense,
+              speed: raceStats.speed,
+              hp: raceStats.hp,
+              luck: playerData.stats.luck,
+              divinePower: raceStats.divinePower,
+              potential: playerData.stats.potential,
+              critRate: playerData.stats.critRate,
+              critDamage: playerData.stats.critDamage,
+            },
+          },
         }
       );
     }
