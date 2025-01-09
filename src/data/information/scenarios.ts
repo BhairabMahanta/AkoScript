@@ -5,6 +5,7 @@ interface Floor {
   enemies: Enemy[]; // Enemies now contain a list of Enemy objects
   miniboss: boolean;
   boss: boolean;
+  waves: number;
   rewards: string[];
 }
 
@@ -29,20 +30,25 @@ export const scenarios: Scenario[] = [
           {
             type: "mob",
             name: "Goblin",
-            waves: ["wave1", "wave2"],
-            hasAllies: ["Wolf"],
+            element: "Wind",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Goblin", "Wolf"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Goblin"],
+              },
+            ],
+            hasAllies: [{ name: "Wolf", element: "Terra" }],
+
             rewards: { gold: 100, xp: 50 },
-          },
-          {
-            type: "mob",
-            name: "Wolf",
-            waves: ["wave1"],
-            hasAllies: [],
-            rewards: { gold: 150, xp: 70 },
           },
         ],
         miniboss: false,
         boss: false,
+        waves: 2,
         rewards: ["Gold", "XP"],
       },
       {
@@ -51,20 +57,25 @@ export const scenarios: Scenario[] = [
           {
             type: "mob",
             name: "Goblin",
-            waves: ["wave1", "wave2"],
-            hasAllies: ["Wolf"],
+            element: "Wind",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Goblin", "Treant"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Goblin"],
+              },
+            ],
+            hasAllies: [{ name: "Treant", element: "Wind" }],
+
             rewards: { gold: 100, xp: 50 },
-          },
-          {
-            type: "mob",
-            name: "Treant",
-            waves: ["wave1"],
-            hasAllies: [],
-            rewards: { gold: 150, xp: 70 },
           },
         ],
         miniboss: true,
         boss: false,
+        waves: 2,
         rewards: ["Gold", "Rune"],
       },
       {
@@ -73,20 +84,25 @@ export const scenarios: Scenario[] = [
           {
             type: "mob",
             name: "Treant",
-            waves: ["wave1", "wave2"],
-            hasAllies: ["Wolf"],
+            element: "Water",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Treant", "Wolf"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Treant"],
+              },
+            ],
+            hasAllies: [{ name: "Wolf", element: "Fire" }],
+
             rewards: { gold: 100, xp: 50 },
-          },
-          {
-            type: "mob",
-            name: "Wolf",
-            waves: ["wave1"],
-            hasAllies: [],
-            rewards: { gold: 150, xp: 70 },
           },
         ],
         miniboss: false,
         boss: true,
+        waves: 2,
         rewards: ["Rare Equipment"],
       },
     ],
@@ -103,21 +119,26 @@ export const scenarios: Scenario[] = [
         enemies: [
           {
             type: "mob",
-            name: "Fire Imp",
-            waves: ["wave1", "wave2"],
-            hasAllies: ["Wolf"],
+            name: "Imp",
+            element: "Fire",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Imp", "Wolf"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Imp"],
+              },
+            ],
+            hasAllies: [{ name: "Wolf", element: "Fire" }],
+
             rewards: { gold: 100, xp: 50 },
-          },
-          {
-            type: "mob",
-            name: "Lava Beast",
-            waves: ["wave1"],
-            hasAllies: [],
-            rewards: { gold: 150, xp: 70 },
           },
         ],
         miniboss: false,
         boss: false,
+        waves: 2,
         rewards: ["Gold", "XP"],
       },
       {
@@ -126,20 +147,25 @@ export const scenarios: Scenario[] = [
           {
             type: "mob",
             name: "Lava Beast",
-            waves: ["wave1", "wave2"],
-            hasAllies: ["Wolf"],
+            element: "Fire",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Lava Beast", "Wolf"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Lava Beast"],
+              },
+            ],
+            hasAllies: [{ name: "Wolf", element: "Wind" }],
+
             rewards: { gold: 100, xp: 50 },
-          },
-          {
-            type: "mob",
-            name: "Fire Elemental",
-            waves: ["wave1"],
-            hasAllies: [],
-            rewards: { gold: 150, xp: 70 },
           },
         ],
         miniboss: true,
         boss: false,
+        waves: 2,
         rewards: ["Rune", "Gold"],
       },
       {
@@ -147,21 +173,26 @@ export const scenarios: Scenario[] = [
         enemies: [
           {
             type: "mob",
-            name: "Fire Imp",
-            waves: ["wave1", "wave2"],
-            hasAllies: ["Wolf"],
+            name: "Imp",
+            element: "Fire",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Imp", "Wolf"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Imp"],
+              },
+            ],
+            hasAllies: [{ name: "Wolf", element: "Fire" }],
+
             rewards: { gold: 100, xp: 50 },
-          },
-          {
-            type: "mob",
-            name: "Fire Elemental",
-            waves: ["wave1"],
-            hasAllies: [],
-            rewards: { gold: 150, xp: 70 },
           },
         ],
         miniboss: false,
         boss: true,
+        waves: 2,
         rewards: ["Legendary Equipment"],
       },
     ],

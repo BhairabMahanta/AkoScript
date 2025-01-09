@@ -13,6 +13,10 @@ import {
   Collection,
   Partials,
   EmbedBuilder,
+  Interaction,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  MessageActionRowComponentBuilder,
 } from "discord.js";
 import { connectToDB, mongoClient } from "./data/mongo/mongo";
 import { CommandHandler } from "./events/handlers/commandHandler";
@@ -118,25 +122,19 @@ process.on("SIGINT", () => {
     .then(() => process.exit())
     .catch((err) => {
       console.error("Error sending status update on restart:", err);
-      process.exit();
     });
 });
 
 process.on("uncaughtException", async (err) => {
   console.error("[UNCAUGHT EXCEPTION]", err);
-  try {
-    await updateStatus(
-      `Bot encountered an error and is shutting down: ${err.message}`
-    );
-  } catch (updateErr) {
-    console.error("[ERROR] Failed to send shutdown status:", updateErr);
-  } finally {
-    process.exit(1); // Exit with failure status
-  }
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[UNHANDLED REJECTION]", reason);
+  // Optionally log to a file or notify the owner
+});
+process.on("InteractionAlreadyReplied", (reason, promise) => {
+  console.error("[INTERACTION REPLIED]", reason);
   // Optionally log to a file or notify the owner
 });
 

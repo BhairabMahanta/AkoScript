@@ -27,6 +27,7 @@ export interface Familiar {
   tier: number;
   stats: Stats;
   experience: Experience;
+  ability: string[];
   moves: Move[];
 }
 
@@ -60,20 +61,21 @@ const allFamiliars: AllFamiliars = {
       moves: [
         {
           id: 1,
-          name: "Flame Strike",
+          name: "Fire Spit",
           power: 150,
           cooldown: 3,
           level: 1,
         },
         {
           id: 2,
-          name: "Dragon Claw",
+          name: "Wannabe Dragon",
           power: 190,
           cooldown: 2,
           level: 1,
         },
         // Add more moves as needed
       ],
+      ability: ["Fire Spit", "Wannabe Dragon"],
     },
     "Water Nymph": {
       id: 2,
@@ -320,6 +322,7 @@ const allFamiliars: AllFamiliars = {
         },
         // Add more moves as needed
       ],
+      ability: ["Ice Breath", "Frost Nova"],
     },
     "Magma Salamander": {
       id: 9,

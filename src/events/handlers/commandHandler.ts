@@ -60,10 +60,10 @@ export class CommandHandler {
           this.client.commands.set(command.name, command);
           console.log(`Command added: ${command.name}`);
         } else {
-          console.log(`Non command File, skipped ${filePath}`);
+          // console.log(`Non command File, skipped ${filePath}`);
         }
       } else {
-        console.log(`Skipped non-command file: ${filePath}`);
+        // console.log(`Skipped non-command file: ${filePath}`);
       }
     }
   }
