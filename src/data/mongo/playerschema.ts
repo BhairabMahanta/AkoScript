@@ -79,10 +79,17 @@ interface CollectionItem {
   name: string;
   element: string;
   stats: CollectionItemStats;
-  moves: string[]; // Adjust type if needed
+  ability: string[];
+  moves: Move[]; // Adjust type if needed
 }
 
 export interface DeckItem {
+  serialId: string;
+  globalId: string;
+  name: string;
+  stats: Stats;
+}
+export interface DungeonDeckItem {
   serialId: string;
   globalId: string;
   name: string;
@@ -94,6 +101,9 @@ interface SelectedFamiliar {
   serialId: number;
   tier: number;
 }
+type MaxLengthArray<T, N extends number> = T[] & { length: number } & {
+  length: N | Exclude<number, N & number>;
+};
 
 interface Player extends Document {
   _id: string;
@@ -113,7 +123,8 @@ interface Player extends Document {
   stuff: Stuff;
   playerpos: PlayerPosition;
   collectionInv: CollectionItem[];
-  deck: DeckItem[];
+  deck: MaxLengthArray<DeckItem, 4>; // Up to 4 elements
+  dungeonDeck: MaxLengthArray<DungeonDeckItem, 6>; // Up to 6 elements
   selectedFamiliars: {
     name: SelectedFamiliar[];
   };
@@ -223,6 +234,14 @@ const playerSchema: Schema<Player> = new Schema<Player>(
       },
     ],
     deck: [
+      {
+        slot: { type: Number, required: true },
+        serialId: { type: String, required: true },
+        globalId: { type: String, required: true },
+        name: { type: String, required: true },
+      },
+    ],
+    dungeonDeck: [
       {
         slot: { type: Number, required: true },
         serialId: { type: String, required: true },

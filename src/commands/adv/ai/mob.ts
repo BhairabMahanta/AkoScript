@@ -1,4 +1,5 @@
 import { mobs } from "../../data/monsterInfo/mobs";
+import { allEnemies } from "../../data/monsterInfo/allEnemies";
 import abilities from "../../../data/abilities";
 import { calculateDamage } from "../../util/glogic";
 import { Ability } from "../../gamelogic/abilitiesFunction";
@@ -25,9 +26,7 @@ interface TargetDetails {
 class MobAI {
   name: string;
   enemyDetails: MobDetails;
-  i: number;
-  abilities: string[];
-  attackPattern: string[];
+  static indexMap: Record<string, number> = {}; // Shared index map for all enemies
   battleLogs: string[];
   ability: Ability;
   allies?: string[];
@@ -35,35 +34,39 @@ class MobAI {
   constructor(that: any, mob: any) {
     this.name = mob.name;
     this.enemyDetails = mob;
-    this.i = 0;
-    console.log("mobaBility: ", mobs[mob.name]?.abilities);
-    this.abilities = mobs[mob.name]?.abilities || [];
-    this.attackPattern = mobs[mob.name]?.attackPattern || [];
+
     this.battleLogs = that.battleLogs;
     this.ability = new Ability(this);
-
-    if (mob.hasAllies && !mob.hasAllies.includes("none")) {
-      this.allies = mob.allies;
-    }
   }
 
-  async move(mob: MobDetails, target: TargetDetails): Promise<number | void> {
-    if (mob.index >= this.attackPattern.length) {
-      mob.index = 0;
+  async move(mob: any, target: TargetDetails): Promise<number | void> {
+    // Initialize index for this mob if not already done
+    if (!(mob.name in MobAI.indexMap)) {
+      MobAI.indexMap[mob.name] = 0;
+    }
+    const attackPattern = mob.attackPattern || [];
+    const currentIndex = MobAI.indexMap[mob.name]; // Access the specific index for this mob
+
+    if (currentIndex >= attackPattern.length) {
+      MobAI.indexMap[mob.name] = 0; // Reset index if it exceeds attackPattern length
     }
 
-    for (; mob.index < this.attackPattern.length; mob.index++) {
-      console.log("i: ", mob.index);
-      const move = this.attackPattern[mob.index];
+    for (
+      ;
+      MobAI.indexMap[mob.name] < attackPattern.length;
+      MobAI.indexMap[mob.name]++
+    ) {
+      console.log("i: ", MobAI.indexMap[mob.name]);
+      const move = attackPattern[MobAI.indexMap[mob.name]];
       console.log("move: ", move);
 
       if (move === "Basic Attack") {
         console.log("moveTrue?: ", move);
-        mob.index++;
+        MobAI.indexMap[mob.name]++;
         return this.normalAttack(mob, target);
       } else {
         console.log("moveFalse?: ", move);
-        mob.index++;
+        MobAI.indexMap[mob.name]++;
         return this.abilityUse(mob, target, move);
       }
     }

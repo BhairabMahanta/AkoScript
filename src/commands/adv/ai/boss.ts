@@ -22,13 +22,12 @@ interface TargetDetails {
 class BossAI {
   name: string;
   abilities: Record<string, any>;
-  attackPattern: string[];
   ability: Ability;
+  static indexMap: Record<string, number> = {}; // Shared index map for tracking boss moves
 
   constructor(that: any, boss: any) {
     this.name = boss.name;
     this.abilities = bosses[boss.name]?.abilities || {};
-    this.attackPattern = bosses[boss.name]?.attackPattern || [];
     this.ability = new Ability(this);
   }
 
@@ -37,16 +36,19 @@ class BossAI {
     target: TargetDetails
   ): Promise<number> {
     const damage = calculateDamage(boss.stats.attack, target.stats.defense);
-    // Boss's logic for normal attack
+    console.log(
+      `${this.name} performs a normal attack on ${target.name}, dealing ${damage} damage.`
+    );
     return damage;
   }
 
   async abilityUse(
     boss: BossDetails,
     target: TargetDetails,
-    nextMove: number
+    moveIndex: number
   ): Promise<void> {
-    const abilityName = this.attackPattern[nextMove];
+    const attackPattern = bosses[boss.name]?.attackPattern || [];
+    const abilityName = attackPattern[moveIndex];
     const ability = this.abilities[abilityName];
 
     if (!ability) {
@@ -58,6 +60,38 @@ class BossAI {
 
     console.log(`${this.name} uses ${abilityName} on ${target.name}!`);
     // Boss's logic for using the specified ability on the target
+  }
+
+  async move(boss: BossDetails, target: TargetDetails): Promise<number | void> {
+    // Initialize index for this boss if not already done
+    if (!(boss.name in BossAI.indexMap)) {
+      BossAI.indexMap[boss.name] = 0;
+    }
+    const attackPattern = bosses[boss.name]?.attackPattern || [];
+
+    const currentIndex = BossAI.indexMap[boss.name];
+
+    if (currentIndex >= attackPattern.length) {
+      BossAI.indexMap[boss.name] = 0; // Reset index if it exceeds attackPattern length
+    }
+
+    for (
+      ;
+      BossAI.indexMap[boss.name] < attackPattern.length;
+      BossAI.indexMap[boss.name]++
+    ) {
+      const moveIndex = BossAI.indexMap[boss.name];
+      const move = attackPattern[moveIndex];
+      console.log(`${this.name} prepares move: ${move}`);
+
+      if (move === "Basic Attack") {
+        BossAI.indexMap[boss.name]++;
+        return this.normalAttack(boss, target);
+      } else {
+        BossAI.indexMap[boss.name]++;
+        return this.abilityUse(boss, target, moveIndex);
+      }
+    }
   }
 }
 

@@ -193,7 +193,7 @@ const registerCommand: Command = {
             magic: randomCardStats.magic || 0,
             magicDefense: randomCardStats.magicDefense || 0,
           },
-
+          ability: randomCardData.card.ability,
           moves: randomCardMoves,
         },
       ],
@@ -204,7 +204,28 @@ const registerCommand: Command = {
           globalId: `${Math.floor(Math.random() * 1000000)}`,
           name: randomCard,
         },
-        { slot: 2, serialId: "empty", globalId: "empty", name: "empty" },
+        {
+          slot: 2,
+          serialId: "player",
+          globalId: message.author.id,
+          name: characterName,
+        },
+        { slot: 3, serialId: "empty", globalId: "empty", name: "empty" },
+        { slot: 4, serialId: "empty", globalId: "empty", name: "empty" },
+      ],
+      dungeonDeck: [
+        {
+          slot: 1,
+          serialId: `${collectionCounter + 1}`,
+          globalId: `${Math.floor(Math.random() * 1000000)}`,
+          name: randomCard,
+        },
+        {
+          slot: 2,
+          serialId: "player",
+          globalId: message.author.id,
+          name: characterName,
+        },
         { slot: 3, serialId: "empty", globalId: "empty", name: "empty" },
         { slot: 4, serialId: "empty", globalId: "empty", name: "empty" },
         { slot: 5, serialId: "empty", globalId: "empty", name: "empty" },
