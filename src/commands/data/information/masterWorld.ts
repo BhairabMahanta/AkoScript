@@ -35,9 +35,7 @@ const masterCommand: Command = {
     let playerProgress = await collection.findOne({
       playerId,
     });
-    let playerData = await collection2.findOne({
-      playerId,
-    });
+    let playerData = await collection2.findOne({ _id: playerId });
 
     const scenario = scenarios[0]; // Default first scenario
     const progress = playerProgress?.progress.find(
@@ -89,6 +87,7 @@ const masterCommand: Command = {
       time: 600000,
     });
     let selectedScenario: any;
+    let thatArrayy: Enemy;
     collector.on("collect", async (interaction) => {
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId === "select-region") {
@@ -122,15 +121,18 @@ const masterCommand: Command = {
             interaction.values[0].split("-")[1],
             10
           );
-          console.log("selected scenario", selectedScenario.id);
+          if (!selectedScenario) selectedScenario = scenarios[0];
+
+          console.log("selected scenario", selectedScenario);
           console.log("selectedFloor", selectedFloor);
-          const updatedEmbed = generateFloorDetailsEmbed(
+          const { embed, thatArray } = generateFloorDetailsEmbed(
             selectedScenario,
             selectedFloor
           );
-
+          thatArrayy = thatArray[0];
+          console.log("thatArray:", thatArrayy);
           await interaction.update({
-            embeds: [updatedEmbed],
+            embeds: [embed],
             components: [regionSelectMenu, firstFloorSelectMenu, floorButtons],
           });
         }
@@ -140,7 +142,8 @@ const masterCommand: Command = {
         switch (interaction.customId) {
           case "start-floor":
             setTimeout(async () => {
-              const battle = new Battle(playerData, thatArray, interaction);
+              if (!thatArrayy) thatArrayy = scenarios[0].floors[0].enemies[0];
+              const battle = new Battle(playerData, thatArrayy, interaction);
               console.log("Starting battle...");
               await battle.startEmbed();
             }, 1000);

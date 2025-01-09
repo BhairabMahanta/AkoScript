@@ -6,6 +6,8 @@ import {
 import { Scenario } from "../../../data/information/scenarios";
 import { allEnemies } from "../monsterInfo/allEnemies";
 import { bosses } from "../monsterInfo/bosses";
+import { Enemy } from "../../adv/action/battle/battle";
+import { iconMap } from "../../adv/action/battle/sendEmbed";
 export const generateEmbed = (
   scenario: Scenario,
   playerProgress: any,
@@ -28,21 +30,38 @@ export const generateEmbed = (
               **Difficulties**: ${scenario.difficulties.join(", ")}
               **Rewards**: ${scenario.rewards.join(", ")}
 
-              **Floors**:
-              ${scenario.floors
-                .map((floor, index) => {
-                  let floorDescription = `${index + 1}.)`;
-                  floorDescription += `${floor.enemies.join(", ")} `;
-                  if (floor.miniboss && !floor.boss) {
-                    floorDescription += ` | Miniboss`;
-                  }
-                  if (floor.boss) {
-                    floorDescription += ` | Boss`;
-                  }
-                  return floorDescription;
-                })
-                .join("\n")}
-            `,
+             **Floors**: 
+${scenario.floors
+  .map((floor, index) => {
+    let floorDescription = `${index + 1}.) `;
+
+    // Extract enemies with name and allies
+    const enemiesDescription = floor.enemies
+      .map(
+        (enemy) =>
+          `${enemy.name} ${
+            enemy.hasAllies.length > 0
+              ? `(Allies: ${enemy.hasAllies
+                  .map((ally) => ally.name)
+                  .join(", ")})`
+              : ""
+          }`
+      )
+      .join(", ");
+
+    floorDescription += `${enemiesDescription} `;
+
+    // Add miniboss or boss status
+    if (floor.miniboss && !floor.boss) {
+      floorDescription += `| Miniboss`;
+    }
+    if (floor.boss) {
+      floorDescription += `| Boss`;
+    }
+
+    return floorDescription;
+  })
+  .join("\n")}`,
   };
 };
 
@@ -59,34 +78,72 @@ export const createFloorSelectMenu = (scenario: Scenario) => {
       )
   );
 };
+interface FloorDetailsEmbedReturn {
+  embed: EmbedBuilder;
+  thatArray: Enemy[]; // Or any other type depending on your requirements
+}
 
 export const generateFloorDetailsEmbed = (
   scenario: Scenario,
   floorNumber: number
-) => {
+): FloorDetailsEmbedReturn => {
   const floor = scenario.floors[floorNumber - 1];
-
-  if (!floor) {
-    return new EmbedBuilder()
-      .setTitle("Error")
-      .setDescription("Floor not found.")
-      .setColor(0xff0000);
-  }
 
   // Fetch enemy details
   const enemiesDetails = floor.enemies
     .map((enemy) => {
       const mob = allEnemies.find((m) => m.name === enemy.name);
       if (mob) {
-        return `**${mob.name}**  
-          **Stats:**  💚 ${mob.stats.hp} ⚔️ ${mob.stats.attack}  🛡️ ${
-          mob.stats.defense
-        } 🌬️ ${mob.stats.speed} 
-          🧎‍♂️ **Abilities:** ${mob.abilities.join(", ")}  
-          🌀 **Attack Pattern:** ${mob.attackPattern.join(" > ")}
-        `;
+        // Extract the main enemy and allies from the `element` array
+
+        // Main enemy stats
+        const mainMob: any =
+          mob.element.find((el) => el.type === enemy.element) || {};
+        const mainIcon = iconMap[enemy.element] || "❓";
+        const mainStats = mainMob.stats;
+        const mainAbilities = mainMob.abilities;
+
+        const mainAttackPattern = mainMob.attackPattern;
+        // Allies stats
+        // Allies stats
+        const allies = enemy.hasAllies
+          .filter((allyName) => allyName.name !== "none") // Skip "none" entries
+          .map((allyName, index) => {
+            const yanemi: any =
+              allEnemies.find((ella) => ella.name === allyName.name) || {};
+            const allyElement = allyName.element;
+            const allyIcon = iconMap[allyElement] || "❓";
+            const allyDetails = yanemi.element.find(
+              (el: any) => el.type === allyElement
+            );
+
+            if (allyDetails) {
+              const { stats } = allyDetails;
+              return `${allyName.name} (${allyIcon}): 💚 ${
+                stats.hp ?? "?"
+              } ⚔️ ${stats.attack ?? "?"} 🛡️ ${stats.defense ?? "?"} 🌬️ ${
+                stats.speed ?? "?"
+              }`;
+            }
+
+            return `${allyName} (${allyIcon}): No stats available`;
+          });
+
+        return `**${mob.name}** (${mainIcon}) : 💚 ${mainStats.hp ?? "?"} ⚔️ ${
+          mainStats.attack ?? "?"
+        } 🛡️ ${mainStats.defense ?? "?"} 🌬️ ${mainStats.speed ?? "?"}
+      🧎‍♂️ **Abilities:** ${mainAbilities.join(", ") || "None"}
+      🌊 **Waves:** ${enemy.waves
+        .map(
+          (wave) =>
+            `\n __Wave ${wave.waveNumber}:__ **${wave.enemies.join(", ")}**`
+        )
+        .join(" ")}
+      👥 **Allies:** ${allies.length ? allies.join("\n") : "None"}
+      🌀 **Attack Pattern:** ${mainAttackPattern.join(" > ") || "None"}
+      `;
       }
-      return `**${enemy}**: Details not available.`;
+      return `**${enemy.name}**: Details not available.`;
     })
     .join("\n\n");
 
@@ -104,21 +161,22 @@ export const generateFloorDetailsEmbed = (
         : "No boss on this floor."
       : "No miniboss or boss on this floor.";
 
-  return new EmbedBuilder()
-    .setTitle(`Floor ${floorNumber} Details - ${scenario.name}`)
-    .setDescription(
-      `
+  return {
+    embed: new EmbedBuilder()
+      .setTitle(`Floor ${floorNumber} Details - __${scenario.name}__`)
+      .setDescription(
+        `
       **🏞️ Floor ${floorNumber} - **  
       
-      **👾 __Enemies__:**  
-      ${enemiesDetails}
-
+      **👾 __Enemies__:**  ${enemiesDetails}
       **👑 Boss/Miniboss:**  
       ${bossDetails}
 
       **🎁 Rewards:**  
       ${floor.rewards.join(", ")}
     `
-    )
-    .setColor(0x00bfff);
+      )
+      .setColor(0x00bfff),
+    thatArray: floor.enemies,
+  };
 };
