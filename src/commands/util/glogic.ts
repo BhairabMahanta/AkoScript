@@ -48,8 +48,6 @@ const buffDebuffLogic = new BuffDebuffLogic(Placeholder);
 // Function to get the index of the maximum value among three
 
 // Define base stats
-const baseAttack = 50;
-const baseDefense = 50;
 
 function calculateDamageOld(
   authorAttack: number,
@@ -65,24 +63,26 @@ function calculateDamageOld(
     )
   );
 }
+const baseAttack = 1340;
+const baseDefense = 50;
 
 // Loop for incrementing attack
 function runCalcDamageTest(): void {
   console.log("Incrementing Attack by 50:");
-  for (let i = 1; i <= 90; i++) {
-    const newAttack = baseAttack + i * 50;
-    const newBaseDefense = 150;
+  for (let i = 1; i <= 2; i++) {
+    const newAttack = baseAttack + i * 10;
+    const newBaseDefense = 528;
     const damage = calculateDamage(newAttack, newBaseDefense);
     console.log(`New Attack: ${newAttack}, Damage: ${damage}`);
   }
   console.log("\nIncrementing Attack by 50 and Defense by 20:");
   for (let i = 1; i <= 90; i++) {
-    const newAttack = baseAttack + i * 50;
-    const newDefense = baseDefense + i * 23;
+    const newAttack = baseAttack + i * 11;
+    const newDefense = baseDefense + i * 5;
     const damage = calculateDamage(newAttack, newDefense);
-    console.log(
-      `New Attack: ${newAttack}, New Defense: ${newDefense}, Damage: ${damage}`
-    );
+    // console.log(
+    //   `New Attack: ${newAttack}, New Defense: ${newDefense}, Damage: ${damage}`
+    // );
   }
 }
 
@@ -113,6 +113,13 @@ function getPlayerMoves(cardName: string): any | null {
   }
   return null;
 }
+function getAbilities(abilityName: string): any | null {
+  const ability = abilities[abilityName];
+  if (ability && ability.description) {
+    return ability;
+  }
+  return null;
+}
 
 // Function to update the cooldown of moves
 function updateMovesOnCd(moves: Move[]): Move[] {
@@ -128,11 +135,13 @@ function updateMovesOnCd(moves: Move[]): Move[] {
 async function handleTurnEffects(turnEnder: any): Promise<void> {
   // Handle debuffs
   for (let i = turnEnder.statuses.debuffs.length - 1; i >= 0; i--) {
-    turnEnder.statuses.debuffs[i].remainingTurns--;
+    const remainingTurns = turnEnder.statuses.debuffs[i].remainingTurns--;
+    console.log("turnEnder1", turnEnder.name, remainingTurns);
     if (turnEnder.statuses.debuffs[i].remainingTurns <= 0) {
+      console.log("turnEnde2r", turnEnder.name, turnEnder.statuses.debuffs[i]);
       buffDebuffLogic.overLogic(
         turnEnder,
-        turnEnder.statuses.buffs[i],
+        turnEnder.statuses.debuffs[i],
         i,
         true
       );
@@ -142,8 +151,14 @@ async function handleTurnEffects(turnEnder: any): Promise<void> {
 
   // Handle buffs
   for (let i = turnEnder.statuses.buffs.length - 1; i >= 0; i--) {
-    turnEnder.statuses.buffs[i].remainingTurns--;
+    const remainingTurns = turnEnder.statuses.buffs[i].remainingTurns--;
+    console.log("turnEnder1buff", turnEnder.name, remainingTurns);
     if (turnEnder.statuses.buffs[i].remainingTurns <= 0) {
+      console.log(
+        "turnEnde2rBuff",
+        turnEnder.name,
+        turnEnder.statuses.buffs[i]
+      );
       buffDebuffLogic.overLogic(
         turnEnder,
         turnEnder.statuses.buffs[i],
@@ -292,7 +307,9 @@ async function critOrNot(
     console.log("normal damage");
     return fomiliarPower === undefined
       ? calculateDamage(authorAttack, enemyDefense)
-      : (calculateDamage(authorAttack, enemyDefense) * fomiliarPower) / 100;
+      : Math.floor(
+          (calculateDamage(authorAttack, enemyDefense) * fomiliarPower) / 100
+        );
   }
 }
 
@@ -397,4 +414,5 @@ export {
   capitalizeFirstLetter,
   critOrNot,
   cycleCooldowns,
+  getAbilities,
 };

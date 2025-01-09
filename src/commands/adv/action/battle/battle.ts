@@ -1,6 +1,7 @@
 import { mongoClient } from "../../../../data/mongo/mongo";
 const db = mongoClient.db("Akaimnky");
 const collection: any = db.collection("akaillection");
+
 import { quests } from "../../quest/quests";
 import {
   critOrNot,
@@ -11,6 +12,7 @@ import {
   getPlayerMoves,
   handleTurnEffects,
   cycleCooldowns,
+  getAbilities,
 } from "../../../util/glogic";
 import { bosses } from "../../../data/monsterInfo/bosses";
 import { mobs } from "../../../data/monsterInfo/mobs";
@@ -35,13 +37,21 @@ import {
   TextChannel,
   Interaction,
   Message,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ModalSubmitInteraction,
 } from "discord.js";
-
+interface hasAllies {
+  name: string;
+  element: string;
+}
 export interface Enemy {
   type: string;
   name: string;
+  element: string; // Primary element for the main enemy
   waves: any[];
-  hasAllies: any[];
+  hasAllies: hasAllies[];
   rewards: any;
 }
 
@@ -54,11 +64,12 @@ const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     .setStyle(3),
   new ButtonBuilder().setCustomId("action_dodge").setLabel("Dodge").setStyle(3)
 );
-import { BattleEmbed } from "./sendEmbed";
+import { BattleEmbed, iconMap } from "./sendEmbed";
 import { BattleBarManager } from "./fillBar";
+import { allEnemies } from "../../../data/monsterInfo/allEnemies";
 
 class Battle {
-  private mobSource: typeof mobs;
+  private allEnemiesSource: typeof allEnemies;
   private bossSource: typeof bosses;
   public enemyDetails: Enemy;
   private message: any;
@@ -67,8 +78,7 @@ class Battle {
   private bossAIClass: BossAI | null;
   private mobAIClass: MobAI | null;
   private mobs: any[];
-  private frontRow: any[];
-  private backRow: any[];
+  private deckRow: any[];
   private abilityOptions: any[];
   private playerFamiliar: any[];
   public familiarInfo: any[];
@@ -80,13 +90,15 @@ class Battle {
   public currentTurn: any;
   private characters: any[];
   private environment: any[];
+  private abilityModal: any;
   private currentTurnIndex: number;
-  private turnCounter: number;
+  private nextTurnHappenedCounter: number;
   public battleLogs: any[];
   private cooldowns: any[];
   private initialMessage: any;
-  private aliveFam: any[];
+  private deadFam: any[];
   private aliveEnemies: any[];
+  private aliveTeam: any[];
   private deadEnemies: any[];
   public battleEmbed: any;
   private allEnemies: any[];
@@ -104,33 +116,29 @@ class Battle {
   private taunted: Boolean;
   private initialisedEmbed: any;
   private barManager: BattleBarManager;
+  private currentWave: number;
 
   constructor(player: ExtendedPlayer, enemy: Enemy, message: any) {
     this.taunted = false;
-    this.mobSource = JSON.parse(JSON.stringify(mobs));
+    this.allEnemiesSource = JSON.parse(JSON.stringify(allEnemies));
     this.bossSource = JSON.parse(JSON.stringify(bosses));
     this.enemyDetails = enemy;
-    console.log("enemyDetails:", this.enemyDetails);
     this.message = message;
     this.continue = true;
     this.player = player;
     this.bossAIClass = null;
     this.mobAIClass = null;
     this.mobs = [];
-    this.frontRow = [];
-    this.backRow = [];
+    this.deckRow = [];
     this.abilityOptions = [];
     this.playerFamiliar = [];
     this.currentTurnId = null;
     console.log("yes");
 
     if (player.deck) {
-      this.frontRow = player.deck.slice(0, 3);
-      this.backRow = player.deck.slice(3, 6);
+      this.deckRow = player.deck;
     } else {
       console.log("Player deck is missing!");
-      this.frontRow = [];
-      this.backRow = [];
     }
 
     this.familiarInfo = [];
@@ -148,16 +156,18 @@ class Battle {
     this.currentTurn = null;
     this.characters = [];
     this.environment = [];
+    this.abilityModal = false;
     this.currentTurnIndex = 0;
-    this.turnCounter = 0;
+    this.nextTurnHappenedCounter = 0;
     this.battleLogs = [];
     this.cooldowns = [];
     this.initialMessage = initialMessage;
-    this.aliveFam = [];
+    this.deadFam = [];
     this.aliveEnemies = [];
     this.deadEnemies = [];
     this.battleEmbed = null;
     this.allEnemies = [];
+    this.aliveTeam = [];
     this.waves = this.enemyDetails.waves;
     this.enemyFirst = false;
     this.pickEnemyOptions = null;
@@ -170,19 +180,25 @@ class Battle {
     this.dodge = { option: null, id: null };
     this.initialisedEmbed = null;
     this.barManager = new BattleBarManager();
+    this.currentWave = 0;
   }
   async initialiseStuff(): Promise<void> {
     console.log("initialised");
     try {
-      for (const familiar of [...this.frontRow, ...this.backRow]) {
+      for (const familiar of [...this.deckRow]) {
         if (
           familiar.name &&
           familiar.name !== "empty" &&
           familiar.name !== null &&
           familiar.name !== this.player.name
         ) {
-          console.log("familiar:", familiar.name);
-          this.familiarInfo.push(familiar);
+          const matchingFamiliar = this.player.collectionInv.find(
+            (item: any) => item.serialId === familiar.serialId
+          );
+
+          if (matchingFamiliar) {
+            this.familiarInfo.push(matchingFamiliar);
+          }
         }
       }
 
@@ -194,28 +210,57 @@ class Battle {
         this.boss = this.bossSource["Dragon Lord"];
       }
 
+      this.mobs.push({
+        name: this.enemyDetails.name,
+        element: this.enemyDetails.element, // First element for the main mob
+      });
+
       if (
         this.enemyDetails.type === "mob" &&
-        this.enemyDetails.hasAllies.includes("none")
+        !this.enemyDetails.hasAllies.includes({ name: "none", element: "none" })
       ) {
-        this.mobs.push(this.enemyDetails.name);
-        this.mobAIClass = new MobAI(this, this.enemyDetails);
-      } else if (
-        this.enemyDetails.type === "mob" &&
-        !this.enemyDetails.hasAllies.includes("none")
-      ) {
-        this.mobs.push(this.enemyDetails.name);
-        this.mobAIClass = new MobAI(this, this.enemyDetails);
-        this.mobs.push(this.enemyDetails.hasAllies.join(","));
+        this.enemyDetails.hasAllies.forEach((allyName) => {
+          this.mobs.push({
+            name: allyName.name,
+            element: allyName.element || "Unknown", // Use next elements for allies
+          });
+        });
       }
 
-      for (const mobName of this.mobs) {
-        const mobData = this.mobSource[mobName];
-        if (mobData) {
-          this.mobInfo.push(mobData);
-        }
-      }
+      this.currentWave = 1; // Start with wave 1
 
+      // Load the first wave of enemies dynamically
+      const waveInfo = this.enemyDetails.waves[this.currentWave - 1].enemies;
+
+      this.mobInfo = this.mobs
+        .map((mob, index) => {
+          const mobData = this.allEnemiesSource.find(
+            (enemy) => enemy.name === mob.name && waveInfo.includes(mob.name)
+          );
+          if (!mobData) {
+            console.log(`No data found for mob: ${mob.name}`);
+            return null; // Or handle as needed
+          }
+          const elementData = mobData.element.find(
+            (el) => el.type === mob.element
+          );
+          if (!elementData) {
+            console.log(
+              `No element data found for ${mob.name} with type ${mob.element}`
+            );
+            return null; // Or handle as needed
+          }
+
+          return {
+            name: mobData.name,
+            type: mob.element,
+            stats: elementData.stats,
+            abilities: elementData.abilities,
+            attackPattern: elementData.attackPattern,
+          };
+        })
+        .filter((mob) => mob !== null);
+      this.mobAIClass = new MobAI(this, this.mobInfo[0]);
       this.allEnemies.push(...this.mobInfo);
 
       if (this.enemyDetails.type === "boss") {
@@ -224,8 +269,7 @@ class Battle {
       } else {
         this.characters = [this.player, ...this.familiarInfo, ...this.mobInfo];
       }
-
-      console.log("characters:", this.characters);
+      this.aliveTeam = [this.player, ...this.familiarInfo];
 
       if (this.player.class != null) {
         this.playerClass = this.player.class;
@@ -342,6 +386,7 @@ class Battle {
   }
   async getNextTurn(): Promise<ExtendedPlayer | null> {
     let nextTurn: ExtendedPlayer | null = null;
+    console.log("Happening1nextTurn");
     const charactersWith100AtkBar = await this.barManager.fillAtkBars(
       this.characters
     );
@@ -351,9 +396,9 @@ class Battle {
 
       this.currentTurn = characterWith100AtkBar;
       this.currentTurnId = characterWith100AtkBar._id;
-      console.log("characterWith100AtkBar:", characterWith100AtkBar.atkBar);
+
       characterWith100AtkBar.atkBar -= 100;
-      console.log("characterWith100AtkBar2:", characterWith100AtkBar.atkBar);
+
       characterWith100AtkBar.attackBarEmoji = await generateAttackBarEmoji(
         characterWith100AtkBar.atkBar
       );
@@ -369,24 +414,20 @@ class Battle {
         fastestCharacter.atkBar
       );
     }
-    console.log("hieee");
+
     await this.barManager.fillHpBars(this.characters);
-    console.log("sussy");
-
+    if (this.nextTurnHappenedCounter >= 1) await this.printBattleResult();
+    console.log("this.currentTurn:", this.currentTurn.name);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await this.performEnemyTurn();
+    console.log("Happening2nextTurn");
+    this.nextTurnHappenedCounter++;
     return nextTurn;
-  }
-
-  async performTurn(): Promise<void> {
-    const attacker = this.getCurrentAttacker(); // Determine if the attacker is a player, familiar, or boss
-    console.log("attacker:", attacker, "attacking", this.enemyToHit);
-    const damage = await this.calculatePFDamage(attacker, this.enemyToHit);
-
-    // Handle dodge mechanics
-    await this.handleStatusEffects(this.enemyToHit, damage, attacker);
   }
 
   async performEnemyTurn(): Promise<void> {
     // Ensure the current turn belongs to an enemy
+    console.log("Happening1Enemy");
     const currentEnemy = this.allEnemies.find(
       (enemy) =>
         enemy.name === this.currentTurn.name &&
@@ -397,7 +438,6 @@ class Battle {
       console.log("No valid enemy found for this turn.");
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Determine the target (30% chance to target player, otherwise target a random alive familiar)
     const isTargetingPlayer = Math.random() < 0.3;
@@ -408,8 +448,7 @@ class Battle {
       isTargetingPlayer || aliveFamiliars.length === 0
         ? this.player
         : aliveFamiliars[Math.floor(Math.random() * aliveFamiliars.length)];
-
-    const damage = await this.mobAIClass?.move(currentEnemy, targetInfo);
+    const damage = await this.mobAIClass?.move(this.currentTurn, targetInfo);
 
     await this.handleStatusEffects(
       targetInfo,
@@ -417,7 +456,28 @@ class Battle {
       currentEnemy
     );
     console.log("gogogogo");
+
     await this.getNextTurn();
+    // this.printBattleResult();
+    await cycleCooldowns(this.cooldowns);
+
+    // await this.performEnemyTurn();
+  }
+
+  async performTurn(): Promise<void> {
+    console.log(
+      "attacker:",
+      this.currentTurn.name,
+      "attacking",
+      this.enemyToHit.name
+    );
+    const damage = await this.calculatePFDamage(
+      this.currentTurn,
+      this.enemyToHit
+    );
+
+    // Handle dodge mechanics
+    await this.handleStatusEffects(this.enemyToHit, damage, this.currentTurn);
   }
   async handleDodge(
     attacker: ExtendedPlayer,
@@ -556,7 +616,7 @@ class Battle {
     name?: string
   ): Promise<void | boolean> {
     const dodgeEffect = await this.handleDodge(attacker, target);
-
+    console.log("IT CMAE ");
     if (dodgeEffect) {
       await handleTurnEffects(attacker);
       this.dodge = { option: null, id: null };
@@ -612,6 +672,7 @@ class Battle {
     if (!statuses || statuses.length === 0) {
       await handleTurnEffects(attacker);
       target.stats.hp -= damage;
+      console.log("YAS DANGIT");
       this.battleLogs.push(
         `+ ${attacker.name} attacks ${target.name} for ${damage} damage using ${
           name !== undefined ? name : "an attack"
@@ -635,6 +696,7 @@ class Battle {
       await handleTurnEffects(attacker);
       return true;
     } else {
+      console.log("YAS TRUE");
       target.stats.hp -= damage;
       this.battleLogs.push(
         `+ ${this.currentTurn.name} attacks ${target.name} for ${damage} damage using an attack`
@@ -670,75 +732,48 @@ class Battle {
     );
   }
   async getDuelActionRow(): Promise<any[]> {
-    // console.log('thiscurenttyrn:', this.currentTurn)
-    // console.log('thiscurenttyrn:', this.playerFamiliar)
-    if (this.playerFamiliar.includes(this.currentTurn)) {
-      let familiarArray: string[] = [];
-      familiarArray.push(this.currentTurn.name);
-      const moveFinder = familiarArray.map((cardName) =>
-        getPlayerMoves(cardName)
+    console.log("duelRowCAction is being called");
+    let moveFinder: any;
+    let playerAbility: any;
+    let hahaThatIsTrue: boolean = false;
+    if (this.familiarInfo.includes(this.currentTurn)) {
+      moveFinder = this.currentTurn.ability.map((abilityName: string) =>
+        getAbilities(abilityName)
       );
+      console.log("AHAHHAHAHA ITS HERE");
+      hahaThatIsTrue = true;
+    } else if (this.currentTurn.name === this.player.name) {
       console.log("wellNOTHERE");
+      playerAbility = classes[this.player.class].abilities;
+      moveFinder = playerAbility.map((abilityName: string) =>
+        getPlayerMoves(abilityName)
+      );
+      hahaThatIsTrue = true;
+    }
+    if (hahaThatIsTrue) {
       try {
-        this.abilityOptions = moveFinder[0]
+        // console.log('moveFinder:', moveFinder)
+        this.abilityOptions = moveFinder
           .map((ability: any) => {
             if (
               ability &&
-              ability.id &&
+              ability.selection != undefined &&
               !this.cooldowns.some((cooldown) => cooldown.name === ability.name)
             ) {
               return {
                 label: ability.name,
                 description: ability.description,
-                value: `fam-${ability.name}`,
+                value: `selection-${ability.name}`,
               };
-            }
-          })
-          .filter(Boolean); // Remove undefined items
-        const cooldownDescriptions =
-          this.cooldowns.length > 0
-            ? "Click here to see your cooldowns"
-            : "There are no cooldowns currently.";
-        this.abilityOptions.push({
-          label: "Cooldowns",
-          description: cooldownDescriptions,
-          value: "cooldowns",
-        });
-        // If there are no abilities available, add a failsafe option
-
-        if (this.abilityOptions.length === 1) {
-          this.abilityOptions.push({
-            label: "Cooldown",
-            description: "Your abilities are on cooldown",
-            value: "cooldown",
-          });
-        }
-        familiarArray = [];
-        // console.log('abilityOptions:', this.abilityOptions)
-      } catch (error) {
-        console.log("moveOptionsError:", error);
-      }
-    } else if (this.currentTurn.name === this.player.name) {
-      const playerAbility = classes[this.player.class].abilities;
-      console.log("stuffimportant:", playerAbility);
-      try {
-        const moveFinder = playerAbility.map((cardName) =>
-          getPlayerMoves(cardName)
-        );
-        // console.log('moveFinder:', moveFinder)
-        this.abilityOptions = moveFinder
-          .map((ability) => {
-            if (
+            } else if (
               ability &&
               ability.description &&
               !this.cooldowns.some((cooldown) => cooldown.name === ability.name)
             ) {
-              // ability.execute(this.currentTurn, this.boss.name)
-              // console.log('execuTE:', ability.execute);
               return {
                 label: ability.name,
                 description: ability.description,
-                value: `player_ability_${ability.name}`,
+                value: `ability-${ability.name}`,
               };
             }
           })
@@ -768,6 +803,7 @@ class Battle {
         console.log("moveOptionsError:", error);
       }
     }
+
     for (const enemy of this.allEnemies) {
       if (enemy.name === this.currentTurn.name) {
         this.enemyFirst = true;
@@ -796,7 +832,7 @@ class Battle {
 
       const stringMenu = new StringSelectMenuBuilder()
         .setCustomId("starter")
-        .setPlaceholder("Make a selection!")
+        .setPlaceholder("Pick Ability!")
         .addOptions(this.abilityOptions);
 
       const stringMenuRow = new ActionRowBuilder().addComponents(stringMenu);
@@ -811,6 +847,7 @@ class Battle {
     }
     return rows;
   }
+
   async printBattleResult(): Promise<void> {
     let updatedEmbed;
     for (const character of this.allEnemies) {
@@ -823,24 +860,23 @@ class Battle {
         character.atkBar = 0;
         character.stats.hp = 0;
         this.deadEnemies.push(character.name);
-        console.log("adeadenem:", this.deadEnemies);
-        console.log("ALIVEFAM:", this.aliveEnemies);
+
         this.aliveEnemies = this.aliveEnemies.filter(
           (enemy) => enemy !== character
         );
-        console.log("ALIVEFAM:", this.aliveEnemies);
         break;
       }
     }
 
-    for (const character of this.familiarInfo) {
-      if (character.stats.hp < 0 && !this.aliveFam.includes(character.name)) {
+    for (const character of this.aliveTeam) {
+      if (character.stats.hp < 0 && !this.deadFam.includes(character.name)) {
         this.battleLogs.push(`${character.name} died lol`);
         character.stats.speed = 0;
         character.atkBar = 0;
         character.stats.hp = 0;
-        this.aliveFam.push(character.name);
-        console.log("ALIVEFAM:", this.aliveFam);
+        this.deadFam.push(character.name);
+        this.aliveTeam.filter((item) => item !== character);
+        console.log("ALIVEFAM:", this.deadFam);
         break;
       }
     }
@@ -917,12 +953,34 @@ class Battle {
       this.message.channel.send("You lost, skill issue.");
       this.player.stats.speed = 0;
     } else {
-      updatedEmbed = await this.initialisedEmbed.sendInitialEmbed();
+      updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
+        this.currentTurn
+      );
       this.initialMessage.edit({
         embeds: [updatedEmbed],
         components: await this.getDuelActionRow(),
       });
     }
+  }
+
+  async critOrNotHandler(
+    critRate: number,
+    critDamage: number,
+    attack: number,
+    defense: number,
+    target: any,
+    ability: any,
+    name: string
+  ) {
+    const damage = await critOrNot(
+      critRate,
+      critDamage,
+      attack,
+      defense,
+      ability
+    );
+
+    await this.handleStatusEffects(target, damage, this.currentTurn, name);
   }
   async startBattle(message: any): Promise<void> {
     console.log("startBattle");
@@ -931,18 +989,20 @@ class Battle {
     this.initialisedEmbed = new BattleEmbed(this);
     console.log("currentTurn:", this.currentTurn.name);
 
-    this.initialMessage = await this.initialisedEmbed.sendInitialEmbed();
-    console.log("initialMessage:", this.initialMessage);
+    this.initialMessage = await this.initialisedEmbed.sendInitialEmbed(
+      this.currentTurn
+    );
 
     this.initialMessage = await (message.channel as TextChannel).send({
       embeds: [this.initialMessage],
       components: await this.getDuelActionRow(),
     });
-    console.log("initialMessage2:");
 
     if (this.enemyFirst) {
       this.printBattleResult();
-      const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed();
+      const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
+        this.currentTurn
+      );
       await this.initialMessage.edit({
         embeds: [updatedEmbed],
         components: await this.getDuelActionRow(),
@@ -958,177 +1018,305 @@ class Battle {
       time: 600000,
     });
     collector.on("collect", async (i: any) => {
-      await i.deferUpdate();
-      console.log("customid:", i.customId);
+      try {
+        if (!["starter"].includes(i.customId)) {
+          await i.deferUpdate(); // Defer for all cases except those that require immediate responses (like modals).
+        }
 
-      if (i.customId === "action_normal") {
+        switch (i.customId) {
+          case "action_normal":
+            await this.handleActionNormal(i);
+            break;
+
+          case "action_select":
+            await this.handleActionSelect(i);
+            break;
+
+          case "starter":
+            await this.handleStarterSelection(i);
+            break;
+
+          case "action_dodge":
+            await this.handleDodgeAction(i);
+            break;
+
+          default:
+            console.error(`Unhandled customId: ${i.customId}`);
+        }
+      } catch (error) {
+        console.error("Error handling interaction:", error);
         try {
-          console.log("aliveEnemiesearlY:", this.aliveEnemies);
-          if (this.pickedChoice || this.aliveEnemies.length === 1) {
-            this.pickedChoice = true; // MongoDB can be used to allow toggling this
-            if (this.aliveEnemies.length === 1) {
-              console.log("aliveEnemies:", this.aliveEnemies);
-              this.enemyToHit = this.aliveEnemies[0];
-            }
-            this.performTurn();
-            await cycleCooldowns(this.cooldowns);
-            await this.getNextTurn();
-            await this.performEnemyTurn();
-            console.log("currentTurn:", this.currentTurn.name);
-            this.printBattleResult();
-          } else {
-            i.followUp({
-              content: "Please pick an enemy to hit using the Select Menu",
-              ephemeral: true,
-            });
-          }
-        } catch (error) {
-          console.error("Error on hit:", error);
-        }
-      } else if (i.customId === "action_select") {
-        const targetIndex = i.values[0];
-        const realTarget = targetIndex.replace("enemy_", "");
-        this.enemyToHit = this.aliveEnemies[parseInt(realTarget, 10)];
-        this.pickedChoice = true;
-        // Continue with your code logic after selecting an enemy
-      } else if (i.customId === "starter") {
-        const selectedClassValue = i.values[0];
-        if (selectedClassValue === "cooldowns") {
-          console.log("check cooldowns", this.cooldowns);
-
-          // Filter out cooldowns that are zero and await the cooldown promises
-          const filteredCooldowns = await Promise.all(
-            this.cooldowns.filter(
-              async (cooldown) => (await cooldown.cooldown) > 0
-            )
-          );
-
-          // Map the filtered cooldowns to descriptions
-          const cooldownDescriptions = await Promise.all(
-            filteredCooldowns.map(
-              async (cooldown) =>
-                `**${cooldown.name}**: ${await cooldown.cooldown} turns left`
-            )
-          );
-
-          i.followUp({
-            content: `**Cooldowns**\n${cooldownDescriptions.join("\n")}`,
+          await i.followUp({
+            content: "An error occurred. Please try again later.",
             ephemeral: true,
           });
-        } else if (this.pickedChoice || this.aliveEnemies.length === 1) {
-          this.pickedChoice = true;
-
-          if (this.aliveEnemies.length === 1) {
-            this.enemyToHit = this.aliveEnemies[0];
-          }
-          if (selectedClassValue.startsWith("player_ability_")) {
-            try {
-              const abilityName = selectedClassValue.replace(
-                "player_ability_",
-                ""
-              );
-              const abilityNameCamel = await toCamelCase(abilityName);
-
-              // Check if the abilityName exists as a method in the Ability class
-              if (typeof this.ability[abilityNameCamel] === "function") {
-                const method = this.ability[abilityNameCamel];
-
-                if (method) {
-                  const functionAsString = method.toString();
-                  // console.log("functionAsString:", functionAsString);
-                  const parameterNames = functionAsString
-                    .replace(/[/][/].*$/gm, "") // remove inline comments
-                    .replace(/\s+/g, "") // remove white spaces
-                    .replace(/[/][*][^/*]*[*][/]/g, "") // remove multiline comments
-                    .split("){", 1)[0]
-                    .replace(/^[^(]*[(]/, "") // extract the parameters
-                    .split(",")
-                    .filter(Boolean); // split the parameters into an array
-
-                  console.log(
-                    `Method ${abilityNameCamel} has the following parameters: ${parameterNames.join(
-                      ", "
-                    )}`
-                  );
-                } else {
-                  console.log(`Method ${abilityNameCamel} does not exist.`);
-                }
-                //bye byuee
-                this.ability[abilityNameCamel](
-                  this.player,
-                  this.enemyToHit,
-                  this.aliveEnemies
-                );
-                await cycleCooldowns(this.cooldowns);
-                await this.getNextTurn();
-                await this.performEnemyTurn();
-
-                this.printBattleResult();
-                const updatedEmbed =
-                  await this.initialisedEmbed.sendInitialEmbed();
-              } else {
-                console.log(`Ability ${abilityName} not found.`);
-              }
-            } catch (error) {
-              console.error("Error on hit:", error);
-              (message.channel as TextChannel).send(
-                'You perhaps have not selected a class yet. Please select it using "a!classselect", and select race using "a!raceselect".'
-              );
-            }
-          } else if (selectedClassValue.startsWith("fam-")) {
-            try {
-              const abilityName = selectedClassValue.replace("fam-", "");
-              console.log("abilityName:a", abilityName);
-              const abilityNameCamel = await toCamelCase(abilityName);
-              console.log("abilityName:a", abilityNameCamel);
-              if (typeof this.ability[abilityNameCamel] === "function") {
-                // Execute the ability by calling it using square brackets
-                for (const familiar of this.familiarInfo) {
-                  if (familiar.name === this.currentTurn.name) {
-                    this.ability[abilityNameCamel](familiar, this.enemyToHit);
-                    await cycleCooldowns(this.cooldowns);
-                    await this.getNextTurn();
-                    await this.performEnemyTurn();
-
-                    this.printBattleResult();
-                    break;
-                  }
-                }
-              } else {
-                console.log(`Ability ${abilityName} not found.`);
-              }
-            } catch (error) {
-              console.log("ErrorFamiliar:", error);
-            }
-          }
-        } else {
-          i.followUp({
-            content: "Please pick an enemy to hit using the Select Menu",
-            ephemeral: true,
-          });
+        } catch {
+          console.error("Failed to send follow-up for the error.");
         }
-      } else if (i.customId === "action_dodge") {
-        //it needs to have like 4 possibilities where 1 is the lower probability i.e dodge and increase player's attack bar by 20, 2nd is just dodge, 3rd is not being able to dodge entirely but reduce the damage by 50% and 4th is just take the hit and 5th is take 1.5x damage
-        const dodgeOptions = [
-          "dodge_and_increase_attack_bar",
-          "dodge",
-          "reduce_damage",
-          "take_hit",
-          "take_1.5x_damage",
-        ];
-        const randomDodge =
-          dodgeOptions[Math.floor(Math.random() * dodgeOptions.length)];
-        this.dodge.option = randomDodge;
-
-        this.performTurn();
-        await cycleCooldowns(this.cooldowns);
-        await this.getNextTurn();
-        await this.performEnemyTurn();
-
-        this.printBattleResult();
       }
     });
   }
+  async handleStarterSelection(i: any) {
+    const selectedClassValue = i.values[0];
+
+    console.log("selectedClassValue:", selectedClassValue);
+
+    if (selectedClassValue.startsWith("selection-")) {
+      try {
+        const abilityName = selectedClassValue.replace("selection-", "");
+        const ability = abilities[abilityName];
+
+        if (!ability || !ability.selection) {
+          console.error("Ability not found or has no selection property");
+          return;
+        }
+
+        const selectionType = ability.selection;
+
+        if (selectionType.startsWith("modal_")) {
+          const requiredCount = parseInt(
+            selectionType.replace("modal_", ""),
+            10
+          );
+
+          if (isNaN(requiredCount)) {
+            console.error("Invalid modal format:", selectionType);
+            return;
+          }
+
+          const teamTargets = this.aliveTeam;
+          const enemyTargets = this.aliveEnemies;
+
+          const maxTargets = ability.type.includes("buff")
+            ? teamTargets.length
+            : enemyTargets.length;
+          const actualRequiredCount = Math.min(requiredCount, maxTargets);
+
+          const modal = new ModalBuilder()
+            .setCustomId(`modal_${abilityName}`)
+            .setTitle(`Select ${actualRequiredCount} Target(s)`);
+
+          const textInput = new TextInputBuilder()
+            .setCustomId("target_input")
+            .setLabel(`Enter exactly ${actualRequiredCount} target(s)`)
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder(
+              `Enter numbers (e.g., 1,2,3). Max: ${actualRequiredCount}`
+            );
+
+          const modalRow =
+            new ActionRowBuilder<TextInputBuilder>().addComponents(textInput);
+
+          modal.addComponents(modalRow);
+
+          // Show the modal to the user
+          await i.showModal(modal);
+
+          // Listen for modal submission specific to this ability
+          const filter = (modalInteraction: ModalSubmitInteraction) =>
+            modalInteraction.customId === `modal_${abilityName}` &&
+            modalInteraction.user.id === i.user.id;
+
+          try {
+            const modalInteraction = await i.awaitModalSubmit({
+              filter,
+              time: 60000,
+            });
+
+            const input =
+              modalInteraction.fields.getTextInputValue("target_input");
+
+            const selectedIndices = input
+              .split(",")
+              .map((index: any) => parseInt(index.trim(), 10))
+              .filter(
+                (index: any) =>
+                  !isNaN(index) && index >= 1 && index <= maxTargets
+              );
+
+            if (selectedIndices.length !== actualRequiredCount) {
+              await modalInteraction.reply({
+                content: `Invalid input. Please provide exactly ${actualRequiredCount} valid targets.`,
+                ephemeral: true,
+              });
+              return;
+            }
+
+            const selectedTargets = ability.type.includes("buff")
+              ? selectedIndices.map(
+                  (index: number) => this.aliveTeam[index - 1]
+                )
+              : selectedIndices.map(
+                  (index: number) => this.aliveEnemies[index - 1]
+                );
+
+            if (selectedTargets.some((target: any) => !target)) {
+              await modalInteraction.reply({
+                content: `One or more selected targets are invalid. Please try again.`,
+                ephemeral: true,
+              });
+              return;
+            }
+            await modalInteraction.deferUpdate();
+            console.log("selectedTargets", selectedTargets);
+
+            // Execute the ability with the selected targets
+            await this.ability.executeAbility(
+              this.currentTurn,
+              selectedTargets,
+              this.aliveEnemies,
+              this.aliveTeam,
+              abilityName
+            );
+
+            await cycleCooldowns(this.cooldowns);
+            await this.getNextTurn();
+
+            const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
+              this.currentTurn
+            );
+          } catch (error) {
+            console.error("Modal submission timed out or was invalid:", error);
+            await i.followUp({
+              content: `Time ran out or submission was invalid. Please try again.`,
+              ephemeral: true,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error processing selection:", error);
+      }
+    } else if (selectedClassValue === "cooldowns") {
+      await i.deferUpdate();
+      console.log("check cooldowns", this.cooldowns);
+
+      // Filter out cooldowns that are zero and await the cooldown promises
+      const filteredCooldowns = await Promise.all(
+        this.cooldowns.filter(async (cooldown) => (await cooldown.cooldown) > 0)
+      );
+
+      // Map the filtered cooldowns to descriptions
+      const cooldownDescriptions = await Promise.all(
+        filteredCooldowns.map(
+          async (cooldown) =>
+            `**${cooldown.name}**: ${await cooldown.cooldown} turns left`
+        )
+      );
+
+      i.followUp({
+        content: `**Cooldowns**\n${cooldownDescriptions.join("\n")}`,
+        ephemeral: true,
+      });
+    } else if (selectedClassValue.startsWith("ability-")) {
+      await i.deferUpdate();
+      if (this.pickedChoice || this.aliveEnemies.length === 1) {
+        console.log("THIS CANNOT BE TRUE");
+        this.pickedChoice = true;
+
+        if (this.aliveEnemies.length === 1) {
+          this.enemyToHit = this.aliveEnemies[0];
+        }
+        try {
+          const abilityName = selectedClassValue.replace("ability-", "");
+          const abilityNameCamel = await toCamelCase(abilityName);
+
+          //bye byuee
+          this.ability.executeAbility(
+            this.currentTurn,
+            this.enemyToHit,
+            this.aliveEnemies,
+            this.aliveTeam,
+            abilityName
+          );
+          await cycleCooldowns(this.cooldowns);
+          await this.getNextTurn();
+          // await this.performEnemyTurn();
+
+          // this.printBattleResult();
+          const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
+            this.currentTurn
+          );
+        } catch (error) {
+          console.error("Error on hit:", error);
+          (i.channel as TextChannel).send(
+            'You perhaps have not selected a class yet. Please select it using "a!classselect", and select race using "a!raceselect".'
+          );
+        }
+      } else if (!selectedClassValue.startsWith("selection-")) {
+        console.log("WALLAHIIII");
+        i.followUp({
+          content: "Please pick an enemy to hit using the Select Menu",
+          ephemeral: true,
+        });
+      }
+    }
+  }
+  async handleActionNormal(i: any) {
+    if (this.pickedChoice || this.aliveEnemies.length === 1) {
+      this.pickedChoice = true;
+
+      if (this.aliveEnemies.length === 1) {
+        this.enemyToHit = this.aliveEnemies[0];
+      }
+
+      await this.performTurn();
+      await cycleCooldowns(this.cooldowns);
+      await this.getNextTurn();
+    } else {
+      await i.followUp({
+        content: "Please pick an enemy to hit using the Select Menu",
+        ephemeral: true,
+      });
+    }
+  }
+  async handleActionSelect(i: any) {
+    const targetIndex = i.values[0];
+    const realTarget = targetIndex.replace("enemy_", "");
+    this.enemyToHit = this.aliveEnemies[parseInt(realTarget, 10)];
+    this.pickedChoice = true;
+
+    await i.followUp({
+      content: `Target selected: ${this.enemyToHit.name}`,
+      ephemeral: true,
+    });
+  }
+
+  async handleDodgeAction(i: any) {
+    const dodgeOptions = [
+      "dodge_and_increase_attack_bar",
+      "dodge",
+      "reduce_damage",
+      "take_hit",
+      "take_1.5x_damage",
+    ];
+    const randomDodge =
+      dodgeOptions[Math.floor(Math.random() * dodgeOptions.length)];
+    this.dodge.option = randomDodge;
+
+    await this.performTurn();
+    await cycleCooldowns(this.cooldowns);
+    await this.getNextTurn();
+
+    await i.followUp({
+      content: `Dodge result: ${randomDodge}`,
+      ephemeral: true,
+    });
+  }
+  parseTargets(input: string): any[] | null {
+    const selectedIndices = input
+      .split(",")
+      .map((index) => parseInt(index.trim(), 10))
+      .filter((index) => !isNaN(index));
+
+    const targets = selectedIndices.map(
+      (index) =>
+        this.aliveTeam[index - 1] || this.aliveEnemies[index - 1] || null
+    );
+
+    return targets.includes(null) ? null : targets;
+  }
+  // Inside the Battle class, but outside startBattle method
 }
 
 export default Battle;

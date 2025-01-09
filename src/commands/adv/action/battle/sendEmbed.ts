@@ -3,12 +3,30 @@ import { quests } from "../../quest/quests";
 import { mongoClient } from "../../../../data/mongo/mongo";
 const db = mongoClient.db("Akaimnky");
 const collection: any = db.collection("akaillection");
+export const iconMap: Record<string, string> = {
+  Fire: "🔥",
+  Water: "💧",
+  Wind: "🍃",
+  Terra: "🌍",
+  Light: "☀️",
+  Dark: "🌑",
+  Ice: "❄️",
+  Electric: "⚡",
+  Nature: "🌿",
+  Métallon: "🔮",
+  increase_attack_and_speed: "🗡️💨",
+  increase_attack: "🗡️",
+  increase_defense: "🛡️",
+  increase_speed: "💨",
+  decrease_attack: "💔",
+  decrease_defense: "🌬️",
+  decrease_speed: "🍃",
+};
 export class BattleEmbed {
   private player: any;
   private enemyDetails: any;
   private battleEmbed: any;
   private battleLogs: any;
-  private currentTurn: any;
   private boss: any;
   private mobInfo: any;
   private familiarInfo: any;
@@ -19,27 +37,14 @@ export class BattleEmbed {
     this.enemyDetails = that.enemyDetails;
     this.battleEmbed = that.battleEmbed;
     this.battleLogs = that.battleLogs;
-    this.currentTurn = that.currentTurn;
     this.boss = that.boss;
     this.mobInfo = that.mobInfo;
     this.familiarInfo = that.familiarInfo;
     this.playerName = that.playerName;
   }
 
-  async sendInitialEmbed(): Promise<any | undefined> {
+  async sendInitialEmbed(currentTurn: any): Promise<any | undefined> {
     try {
-      const iconMap: Record<string, string> = {
-        increase_attack_and_speed: "🗡️💨",
-        increase_attack: "🗡️",
-        increase_defense: "🛡️",
-        increase_speed: "💨",
-        decrease_attack: "💔",
-        decrease_defense: "🌬️",
-        decrease_speed: "🍃",
-      };
-
-      console.log(this.player.name, "-inside", this.player.attackBarEmoji);
-
       this.battleEmbed = new EmbedBuilder()
         .setTitle(`Battle VS ${this.enemyDetails.name}`)
         .setFooter({ text: "You can run if you want lol no issues" })
@@ -56,8 +61,6 @@ export class BattleEmbed {
         this.battleLogs.shift();
       }
 
-      console.log("battleLogsLengthAfter:", this.battleLogs.length);
-
       if (this.battleLogs.length > 0) {
         this.battleEmbed.setDescription(
           `**Battle Logs:**\n\`\`\`diff\n+ ${this.battleLogs.join("\n")}\`\`\``
@@ -72,7 +75,7 @@ export class BattleEmbed {
 
       this.battleEmbed.addFields({
         name: "Current Turn",
-        value: `\`\`\`${this.currentTurn.name}\`\`\``,
+        value: `\`\`\`${currentTurn.name}\`\`\``,
         inline: false,
       });
 
@@ -88,7 +91,9 @@ export class BattleEmbed {
         });
       } else if (this.enemyDetails.type === "mob") {
         let mobInfo = ""; // Initialize an empty string to store the info
+        let enemyEmojis = "";
         for (const mob of this.mobInfo) {
+          enemyEmojis += iconMap[mob.type];
           let buffIcons = "";
           let debuffIcons = "";
           for (const buff of mob.statuses.buffs) {
@@ -107,11 +112,17 @@ export class BattleEmbed {
             mob.stats.hp
           } ♥️ \n[2;36m [2;34m${mob.attackBarEmoji} ${Math.floor(
             mob.atkBar
-          )} [2;34mstts [${buffIcons}${debuffIcons}]\n\n`;
+          )} [2;34m [${buffIcons}${debuffIcons}] ${
+            currentTurn.name === mob.name
+              ? "☝️"
+              : mob.stats.hp <= 0
+              ? "💀"
+              : "🙋"
+          }\n\n`;
         }
 
         this.battleEmbed.addFields({
-          name: "Enemies Info:",
+          name: `Enemies Info: ${enemyEmojis}`,
           value: `\`\`\`ansi\n${mobInfo}\`\`\``,
           inline: true,
         });
@@ -119,10 +130,11 @@ export class BattleEmbed {
 
       if (this.player) {
         let playerAndFamiliarsInfo = ""; // Initialize an empty string to store the info
-
+        let allyEmojis = "";
         for (const familiar of this.familiarInfo) {
           let buffIcons = "";
           let debuffIcons = "";
+          // allyEmojis += iconMap[familiar.type];
           for (const buff of familiar.statuses.buffs) {
             if (iconMap[buff.type]) {
               buffIcons += iconMap[buff.type];
@@ -139,7 +151,9 @@ export class BattleEmbed {
             familiar.hpBarEmoji
           } ${familiar.stats.hp} ♥️ \n[2;36m [2;34m${familiar.attackBarEmoji} ${Math.floor(
             familiar.atkBar
-          )} [2;34mb&d [${buffIcons}${debuffIcons}]\n\n`;
+          )} [2;34m [${buffIcons}${debuffIcons}] ${
+            currentTurn.name === familiar.name ? "☝️" : "🙋"
+          }\n\n`;
         }
 
         let buffIcons = "";
@@ -160,7 +174,9 @@ export class BattleEmbed {
           this.player.stats.magic
         }\n[2;32m ${this.player.hpBarEmoji} ${this.player.stats.hp} ♥️ \n[2;36m [2;34m${
           this.player.attackBarEmoji
-        } ${Math.floor(this.player.atkBar)} [2;34mb&d [${buffIcons}${debuffIcons}]`;
+        } ${Math.floor(this.player.atkBar)} [2;34m [${buffIcons}${debuffIcons}] ${
+          currentTurn.name === this.player.name ? "☝️" : "🙋"
+        }`;
 
         this.battleEmbed.addFields({
           name: "Your Team Info:",

@@ -22,7 +22,6 @@ export class BattleBarManager {
 
       // Check if any character already has atkBar >= 100
       for (const character of characters) {
-        console.log("character.atkBar", character.atkBar);
         if (character.atkBar >= 100) {
           console.log("found atkBar >= 100 for:", character.name);
           charactersWith100AtkBar.push(character);
@@ -37,11 +36,9 @@ export class BattleBarManager {
 
         const factor =
           (100 - toMinus) / (character.stats.speed * 0.05 * speedMultiplier);
-        console.log("factor:", factor);
+
         return Math.min(minFactor, factor);
       }, Infinity);
-
-      console.log("Calculated smallestFactor:", smallestFactor);
 
       // Update atkBar for all characters using smallestFactor
       for (const character of characters) {
@@ -64,7 +61,7 @@ export class BattleBarManager {
       if (charactersWith100AtkBar.length > 0) {
         console.log(
           "Processing characters with 100 atkBar:",
-          charactersWith100AtkBar
+          charactersWith100AtkBar[0].name
         );
       }
     } catch (error) {
