@@ -10,10 +10,13 @@ export async function handleSelectClass(
   sentMessage: Message,
   classRow: any
 ): Promise<void> {
-  const classOptions = Object.keys(classesData).map((className) => ({
-    label: className,
-    value: `class-${className}`,
-  }));
+  const classOptions = Object.entries(classesData) // Use Object.entries for key-value pairs
+    .filter(([className, classData]) => classData.state !== "locked") // Filter out locked classes
+    .map(([className]) => ({
+      // Map remaining classes to options
+      label: className,
+      value: `class-${className}`,
+    }));
 
   const classFields = classOptions.map((classOption) => {
     const className = classOption.value.replace("class-", "");
