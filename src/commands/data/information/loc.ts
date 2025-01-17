@@ -65,7 +65,7 @@ const locationsFloor1: Location[] = [
   new Location(
     "Forest Clearing",
     "A peaceful clearing in the forest.",
-    ["Gather Ingredients"],
+    ["gather_ingredients"],
     ["Dragon Lord", "Giant Spider"],
     ["Slimes"],
     "Easy",
@@ -75,7 +75,7 @@ const locationsFloor1: Location[] = [
   new Location(
     "Cave Entrance",
     "A mysterious cave entrance beckons you.",
-    ["Defeat the Spiders"],
+    ["defeat_the_spiders"],
     ["Giant Spider"],
     ["y"],
     "Moderate",
