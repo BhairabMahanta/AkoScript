@@ -22,6 +22,9 @@ import allFamiliars from "../../data/information/allfamiliars";
 import { ExtendedClient } from "../..";
 import { Command } from "../../@types/command";
 import { capitalizeFirstLetter } from "./glogic";
+import { addScenario } from "../player/scenarioUpdate/scenarioFunctions";
+const db = mongoClient.db("Akaimnky");
+const scenarioCollection: any = db.collection("scenarioData");
 
 const collectionName = "akaillection";
 const story = require("./story.json"); // Load the story from the JSON file
@@ -43,9 +46,46 @@ const registerCommand: Command = {
   ): Promise<void> {
     const db = client.db;
     const akaillection = "akaillection";
-
     let Player = await playerModel(db, akaillection);
+    const forestRegion2 = {
+      id: "forest-region",
+      name: "Forest Region",
+      description: "A lush green forest filled with magical creatures.",
+      number: 1, // Scenario number
+      difficulties: ["Easy", "Normal", "Hard"],
+      rewards: ["Gold", "XP", "Items"],
+      floors: [
+        {
+          floorNumber: 1,
+          enemies: [
+            {
+              type: "mob",
+              name: "Goblin",
+              element: "Wind",
+              waves: [
+                {
+                  waveNumber: 1,
+                  enemies: ["Goblin", "Wolf"],
+                },
+                {
+                  waveNumber: 2,
+                  enemies: ["Goblin"],
+                },
+              ],
+              hasAllies: [{ name: "Wolf", element: "Terra" }],
+              rewards: { gold: 100, xp: 50 },
+            },
+          ],
+          miniboss: false,
+          boss: false,
+          waves: 2,
+          rewards: ["Gold", "XP"],
+        },
+      ],
+    };
 
+    // Add the "Forest Region" scenario
+    await addScenario(message.author.id, forestRegion2);
     if (!startedTutorial.includes(message.author.id)) {
       if (!args[0] || args[0].length > 20 || args[0].length < 3) {
         // Check character name validity
@@ -244,7 +284,45 @@ const registerCommand: Command = {
     } catch (error) {
       console.error("Error saving player data:", error);
     }
+    const forestRegion = {
+      id: "forest-region",
+      name: "Forest Region",
+      description: "A lush green forest filled with magical creatures.",
+      number: 1, // Scenario number
+      difficulties: ["Easy", "Normal", "Hard"],
+      rewards: ["Gold", "XP", "Items"],
+      floors: [
+        {
+          floorNumber: 1,
+          enemies: [
+            {
+              type: "mob",
+              name: "Goblin",
+              element: "Wind",
+              waves: [
+                {
+                  waveNumber: 1,
+                  enemies: ["Goblin", "Wolf"],
+                },
+                {
+                  waveNumber: 2,
+                  enemies: ["Goblin"],
+                },
+              ],
+              hasAllies: [{ name: "Wolf", element: "Terra" }],
+              rewards: { gold: 100, xp: 50 },
+            },
+          ],
+          miniboss: false,
+          boss: false,
+          waves: 2,
+          rewards: ["Gold", "XP"],
+        },
+      ],
+    };
 
+    // Add the "Forest Region" scenario
+    await addScenario(playerData2.id, forestRegion);
     const wantTutorial = new EmbedBuilder()
       .setColor("DarkBlue")
       .setDescription(

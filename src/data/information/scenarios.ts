@@ -5,6 +5,8 @@ interface Floor {
   enemies: Enemy[]; // Enemies now contain a list of Enemy objects
   miniboss: boolean;
   boss: boolean;
+  bosses?: string[];
+  quests?: string[];
   waves: number;
   rewards: string[];
 }
@@ -100,6 +102,36 @@ export const scenarios: Scenario[] = [
             rewards: { gold: 100, xp: 50 },
           },
         ],
+        miniboss: false,
+        boss: false,
+        waves: 2,
+        rewards: ["Rare Equipment"],
+      },
+
+      {
+        floorNumber: 4,
+        enemies: [
+          {
+            type: "mob",
+            name: "Treant",
+            element: "Water",
+            waves: [
+              {
+                waveNumber: 1,
+                enemies: ["Treant", "Wolf"],
+              },
+              {
+                waveNumber: 2,
+                enemies: ["Treant"],
+              },
+            ],
+            hasAllies: [{ name: "Wolf", element: "Fire" }],
+
+            rewards: { gold: 100, xp: 50 },
+          },
+        ],
+        quests: ["gather_ingredients"],
+        bosses: ["Giant Spider"],
         miniboss: false,
         boss: true,
         waves: 2,

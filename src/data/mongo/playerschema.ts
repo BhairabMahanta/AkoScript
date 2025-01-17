@@ -295,7 +295,7 @@ async function playerModel(
   db: mongoose.Connection,
   collectionName: string
 ): Promise<Model<Player>> {
-  return db.model<Player>("Player", playerSchema, collectionName);
+  return db.model<Player>("akaillection", playerSchema, collectionName);
 }
 
 export { playerModel, Player };
