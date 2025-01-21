@@ -15,8 +15,8 @@ export const generateEmbed = (
 ) => {
   const progress = playerProgress;
 
-  const isUnlocked = progress ? progress.unlocked : false;
-  const completedFloors = progress ? progress.completedFloors : 0;
+  const isUnlocked = progress ? true : false;
+  const completedFloors = progress ? progress.floors.length - 1 : 0;
   const bestDifficulty = progress ? progress.bestDifficulty : "None";
 
   return {
@@ -81,11 +81,14 @@ export const createFloorSelectMenu = (scenario: Scenario) => {
 interface FloorDetailsEmbedReturn {
   embed: EmbedBuilder;
   thatArray: Enemy[]; // Or any other type depending on your requirements
+  uhNumber: number;
+  bossFloorBoolean: boolean;
 }
 
 export const generateFloorDetailsEmbed = (
   scenario: Scenario,
-  floorNumber: number
+  floorNumber: number,
+  thatTrue: Boolean
 ): FloorDetailsEmbedReturn => {
   const floor = scenario.floors[floorNumber - 1];
 
@@ -113,11 +116,13 @@ export const generateFloorDetailsEmbed = (
               allEnemies.find((ella) => ella.name === allyName.name) || {};
             const allyElement = allyName.element;
             const allyIcon = iconMap[allyElement] || "❓";
-            const allyDetails = yanemi.element.find(
-              (el: any) => el.type === allyElement
-            );
+            const allyDetails = yanemi.element.find((el: any) => {
+              console.log("el.type", el.type, "allyElement:", allyElement);
+              return el.type === allyElement;
+            });
 
             if (allyDetails) {
+              console.log("hahaBROOOOOO");
               const { stats } = allyDetails;
               return `${allyName.name} (${allyIcon}): 💚 ${
                 stats.hp ?? "?"
@@ -125,7 +130,7 @@ export const generateFloorDetailsEmbed = (
                 stats.speed ?? "?"
               }`;
             }
-
+            console.log("allyName:", allyName);
             return `${allyName} (${allyIcon}): No stats available`;
           });
 
@@ -150,26 +155,18 @@ export const generateFloorDetailsEmbed = (
   // Fetch miniboss or boss details
   const bossDetails =
     floor.miniboss || floor.boss
-      ? floor.boss
-        ? allEnemies.find(
-            (b) => b.type === "boss" && b.ofScenario === scenario.id
-          )?.name || "Boss details not available"
-        : floor.miniboss
-        ? allEnemies.find(
-            (b) => b.type === "boss" && b.ofScenario === scenario.id
-          )?.name || "Miniboss details not available"
-        : "No boss on this floor."
-      : "No miniboss or boss on this floor.";
+      ? floor.bosses?.join(",") ?? "No MiniBoss on this floor."
+      : "No miniboss found";
 
   return {
     embed: new EmbedBuilder()
       .setTitle(`Floor ${floorNumber} Details - __${scenario.name}__`)
       .setDescription(
         `
-      **🏞️ Floor ${floorNumber} - **  
+      **🏞️ Floor ${floorNumber} - ${thatTrue ? "🔒Locked" : "✅ Unlocked"}**  
       
       **👾 __Enemies__:**  ${enemiesDetails}
-      **👑 Boss/Miniboss:**  
+      **👑 MiniBoss:**  
       ${bossDetails}
 
       **🎁 Rewards:**  
@@ -178,5 +175,7 @@ export const generateFloorDetailsEmbed = (
       )
       .setColor(0x00bfff),
     thatArray: floor.enemies,
+    uhNumber: floor.floorNumber,
+    bossFloorBoolean: floor.boss,
   };
 };

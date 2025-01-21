@@ -7,10 +7,16 @@ import {
   TextChannel,
 } from "discord.js";
 import { mongoClient } from "../../../../data/mongo/mongo";
-import { Location, Floor, allFloors } from "../../../data/information/loc";
+import { Location, allFloors } from "../../../data/information/loc";
 import { handleNavigation } from "./navigation";
 import { quests } from "../../quest/quests";
 import { bosses } from "../../../data/monsterInfo/bosses";
+import { interfaceScenario } from "../../../../data/mongo/scenarioInterface";
+import {
+  Scenario,
+  scenarios,
+  Floor,
+} from "../../../../data/information/scenarios";
 
 const areaImage = "src/commands/data/information/area2.png";
 
@@ -25,10 +31,15 @@ export class Adventure {
     message: Message<boolean>,
     initialMessage: any,
     player: any,
-    selectedLocation: Location,
-    selectedFloor: Floor,
+    selectedLocaton: interfaceScenario,
     stringMenuRow: any
   ) {
+    const selectedLocation: Scenario =
+      scenarios.find((scenario) => scenario.id === selectedLocation.id) ??
+      scenarios[0];
+    let selectedFlooraaa: Floor =
+      selectedLocation.floors.find((floor: Floor) => floor.boss === true) ??
+      selectedLocation.floors[0];
     const adventureIntoEmbedConfirmation = new EmbedBuilder()
       .setTitle(selectedLocation.name)
       .setDescription(
@@ -40,26 +51,26 @@ export class Adventure {
           value: ` \`\`Level: ${player.exp.level}\`\`, Username: __${player.name}__ `,
           inline: false,
         },
-        {
-          name: "**Level Restriction and Level Suggestion**",
-          value: `Area only for \`\`Level ${selectedLocation.requiredLevel}\`\` and Above!\n Suggested Level for this area is 'makeLevelSuggestion'`,
-          inline: false,
-        },
+        // {
+        //   name: "**Level Restriction and Level Suggestion**",
+        //   value: `Area only for \`\`Level ${selectedLocation.requiredLevel}\`\` and Above!\n Suggested Level for this area is 'makeLevelSuggestion'`,
+        //   inline: false,
+        // },
         {
           name: "**Party recommended**",
-          value: `${selectedLocation.mobs.join("\n")}`,
+          value: `${selectedFlooraaa.mobs?.join("\n")}`,
           inline: false,
         },
         {
           name: "**Start Adventuring?**",
           value: 'To start, click on the "Let’s Dive into it" button!!',
           inline: false,
-        },
-        {
-          name: "**Difficulty**",
-          value: `${selectedLocation.difficulty}`,
-          inline: false,
         }
+        // {
+        //   name: "**Difficulty**",
+        //   value: `${selectedLocation.difficulty}`,
+        //   inline: false,
+        // }
       );
     const confirmationRowTwo = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -98,7 +109,8 @@ export class Adventure {
             adventureIntoEmbedConfirmation,
             initialMessage,
             areaImage,
-            player
+            player,
+            selectedLocaton
           );
         } else if (i.customId === "cancel_adventure") {
           await i.update({
@@ -135,12 +147,12 @@ export class Adventure {
                   "More info About the available quests in this area!"
                 );
 
-              const availableQuests = selectedLocation.quests.map(
+              const availableQuests = selectedFlooraaa.quests?.map(
                 (questName) => quests[questName]
               );
 
               // Iterate over the available quests and modify the embed fields
-              availableQuests.forEach((quest, index) => {
+              availableQuests?.forEach((quest, index) => {
                 // Modify the existing fields or add new ones to the embedBuilder
                 questEmbed.addFields({
                   name: ` ${index + 1} • ${quest.title}`,
@@ -165,12 +177,12 @@ export class Adventure {
                   "More info About the available Bosses in this area!"
                 );
 
-              const availableBosses = selectedLocation.bosses.map(
+              const availableBosses = selectedFlooraaa.bosses?.map(
                 (bossName) => bosses[bossName]
               );
 
               // Iterate over the available quests and modify the embed fields
-              availableBosses.forEach((boss, index) => {
+              availableBosses?.forEach((boss, index) => {
                 // Modify the existing fields or add new ones to the embedBuilder
                 questEmbed.addFields({
                   name: ` ${index + 1} • ${boss.name}`,
@@ -219,4 +231,94 @@ export class Adventure {
       }
     });
   }
+}
+
+import { ExtendedClient } from "../../../..";
+
+export async function handleAdventure(
+  client: ExtendedClient,
+  message: any,
+  player: any,
+  selectedLocation: any
+): Promise<void> {
+  const adventure = new Adventure(client);
+
+  const adventureConfirmEmbed = new EmbedBuilder()
+    .setTitle(selectedLocation.name)
+    .setDescription("Know what this journey of yours has to offer!")
+    .addFields(
+      {
+        name: "**Quests**",
+        value:
+          selectedLocation.quests.length > 0
+            ? selectedLocation.quests
+                .map((quest: any) => `'${quest}'`)
+                .join(", ")
+            : "There are no quests.",
+        inline: false,
+      },
+      {
+        name: "**Bosses**",
+        value:
+          selectedLocation.bosses.length > 0
+            ? selectedLocation.bosses
+                .map((boss: any) => `\`${boss}\``)
+                .join(", ")
+            : "There are no bosses.",
+        inline: false,
+      },
+      {
+        name: "**Mobs**",
+        value: `${selectedLocation.mobs.join("\n")}`,
+        inline: false,
+      },
+      {
+        name: "**Adventure**",
+        value: "Go on the Adventure Lad!",
+        inline: false,
+      },
+      {
+        name: "**Difficulty**",
+        value: `${selectedLocation.difficulty[0]}`,
+        inline: false,
+      }
+    );
+
+  const optionSelectMenu = new StringSelectMenuBuilder()
+    .setCustomId("option_select")
+    .setPlaceholder("Select an option")
+    .addOptions([
+      { label: "Quests", value: "klik_quests" },
+      { label: "Bosses", value: "klik_bosses" },
+      { label: "Mobs", value: "klik_mobs" },
+    ]);
+
+  const stringMenuRow =
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      optionSelectMenu
+    );
+
+  const confirmationRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("start_adventure")
+      .setLabel("Start")
+      .setStyle(3),
+    new ButtonBuilder()
+      .setCustomId("cancel_adventure")
+      .setLabel("Go Back")
+      .setStyle(4)
+  );
+
+  const initialMessage = await (message.channel as TextChannel).send({
+    embeds: [adventureConfirmEmbed],
+    components: [stringMenuRow, confirmationRow],
+  });
+
+  adventure.setupCollector(
+    message,
+    initialMessage,
+    player,
+    selectedLocation,
+    stringMenuRow
+  );
 }

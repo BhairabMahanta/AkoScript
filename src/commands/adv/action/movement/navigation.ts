@@ -13,6 +13,7 @@ import Battle from "../battle/battle";
 import { mongoClient } from "../../../../data/mongo/mongo";
 import { NPC } from "../../quest/npc";
 import { ExtendedPlayer } from "../../../gamelogic/buffDebuffManager";
+import { interfaceScenario } from "../../../../data/mongo/scenarioInterface";
 
 let updatedImageBuffer: any;
 let hasAttackButton = false;
@@ -121,7 +122,8 @@ async function handleNavigation(
   adventureEmbed: EmbedBuilder,
   initialMessage: Message<boolean>,
   areaImage: any,
-  player: ExtendedPlayer
+  player: ExtendedPlayer,
+  selectedLocation: interfaceScenario
 ): Promise<void> {
   const db = mongoClient.db("Akaimnky");
   const collection: any = db.collection("akaillection");
@@ -226,7 +228,12 @@ async function handleNavigation(
       await initialMessage.edit({ components: [] });
       const thatArray = gameImage.elementArray[0];
       setTimeout(async () => {
-        const battle = new Battle(playerData2, thatArray, message);
+        const battle = new Battle(
+          playerData2,
+          thatArray,
+          message,
+          selectedLocation
+        );
         console.log("Starting battle...");
         await battle.startEmbed();
       }, 1000);
