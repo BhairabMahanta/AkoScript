@@ -12,9 +12,9 @@ import { mongoClient } from "../../../data/mongo/mongo";
 const db = mongoClient.db("Akaimnky");
 const collection: any = db.collection("worldMapCollection");
 const worldMapCommand: Command = {
-  name: "worldmap",
+  name: "viewworldmap",
   description: "Displays the current world map with available scenarios.",
-  aliases: ["wm"],
+  aliases: ["vwm"],
   async execute(
     client: ExtendedClient,
     message: any,
@@ -66,34 +66,50 @@ const worldMapCommand: Command = {
         const bestDifficulty = progress ? progress.bestDifficulty : "None";
 
         return {
-          color: 0x0099ff,
-          title: `World Map - ${scenario.name}`,
-          description: `
-              **Description**: ${scenario.description}
-              **Unlocked**: ${isUnlocked ? "✅ Yes" : "🔒 No"}
-              **Best Difficulty Completed**: ${bestDifficulty}
-              **Completed Floors**: ${completedFloors}
-              **Difficulties**: ${scenario.difficulties.join(", ")}
-              **Rewards**: ${scenario.rewards.join(", ")}
+          color: color,
+          title: `World Map Progression - ${scenario.name}`,
+          description: ` ### Explore the world! Select a region to view its details
+                    **Description**: ${scenario.description}
+                    **Unlocked**: ${isUnlocked ? "✅ Yes" : "🔒 No"}
+                    **Best Difficulty Completed**: ${bestDifficulty}
+                    **Completed Floors**: ${completedFloors}
+                    **Difficulties**: ${scenario.difficulties.join(", ")}
+                    **Rewards**: ${scenario.rewards.join(", ")}
+      
+                   **Floors**: 
+      ${scenario.floors
+        .map((floor, index) => {
+          let floorDescription = `${index + 1}.) `;
 
-              **Floors**:
-              ${scenario.floors
-                .map((floor, index) => {
-                  let floorDescription = `${index + 1}.)`;
-                  floorDescription += `${floor.enemies.join(", ")} `;
-                  if (floor.miniboss && !floor.boss) {
-                    floorDescription += ` | Miniboss`;
-                  }
-                  if (floor.boss) {
-                    floorDescription += ` | Boss`;
-                  }
-                  return floorDescription;
-                })
-                .join("\n")}
-            `,
+          // Extract enemies with name and allies
+          const enemiesDescription = floor.enemies
+            .map(
+              (enemy) =>
+                `${enemy.name} ${
+                  enemy.hasAllies.length > 0
+                    ? `(Allies: ${enemy.hasAllies
+                        .map((ally) => ally.name)
+                        .join(", ")})`
+                    : ""
+                }`
+            )
+            .join(", ");
+
+          floorDescription += `${enemiesDescription} `;
+
+          // Add miniboss or boss status
+          if (floor.miniboss && !floor.boss) {
+            floorDescription += `| Miniboss`;
+          }
+          if (floor.boss) {
+            floorDescription += `| Boss`;
+          }
+
+          return floorDescription;
+        })
+        .join("\n")}`,
         };
       };
-
       // Function to create navigation buttons
       const generateButtons = (isUnlocked: any) => {
         const row = new ActionRowBuilder().addComponents(

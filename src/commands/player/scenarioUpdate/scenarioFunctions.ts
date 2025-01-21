@@ -1,25 +1,25 @@
+import { ScenarioData } from "../../../data/mongo/playerScenarioSchema";
+import { mongoClient } from "../../../data/mongo/mongo";
 import {
   Floor,
-  Scenario,
-  ScenarioData,
-} from "../../../data/mongo/playerScenarioSchema";
-import { mongoClient } from "../../../data/mongo/mongo";
+  interfaceScenario,
+} from "../../../data/mongo/scenarioInterface";
 const db = mongoClient.db("Akaimnky");
 
 const scenarioCollection: any = db.collection("scenarioData");
 
 export async function addScenario(
   playerId: string,
-  scenarioData: any
+  scenarioData: interfaceScenario
 ): Promise<void> {
   const dbFilter = { _id: playerId };
   let playerScenarios = await scenarioCollection.findOne(dbFilter);
   if (!playerScenarios) {
-    playerScenarios = { scenarios: [] }; // Initialize with an empty structure
+    playerScenarios = { _id: playerId, scenarios: [] };
   }
   console.log("playerScenarios", playerScenarios);
   const scenarioExists = playerScenarios.scenarios.some(
-    (scenario: any) => scenario.name === scenarioData.name
+    (scenario: interfaceScenario) => scenario.name === scenarioData.name
   );
 
   if (scenarioExists) {
@@ -27,17 +27,15 @@ export async function addScenario(
     return;
   }
 
-  const newScenario: Scenario = {
+  const newScenario: interfaceScenario = {
     ...scenarioData,
     floors: [], // Initialize floors as empty
   };
 
-  playerScenarios.scenarios.push(newScenario);
-  console.log("playerScenarios:", playerScenarios);
   // Save the player data first before adding floors
   await scenarioCollection.updateOne(
     { _id: playerId },
-    { $set: { scenarios: playerScenarios } },
+    { $set: { scenarios: [newScenario] } },
     { upsert: true }
   );
   setTimeout(async () => {
@@ -62,13 +60,13 @@ export async function addScenario(
 export async function addFloor(
   playerId: string,
   scenarioName: string,
-  floorData: any
+  floorData: Floor
 ): Promise<void> {
   const dbFilter = { _id: playerId };
   const playerData = await scenarioCollection.findOne(dbFilter);
-  console.log("lauerData;", playerData);
+  console.log("playerData;", playerData);
   const scenario = playerData.scenarios.find(
-    (scenario: any) => scenario.name === scenarioName
+    (scenario: interfaceScenario) => scenario.name === scenarioName
   );
 
   if (!scenario) {
@@ -77,7 +75,7 @@ export async function addFloor(
   }
 
   const floorExists = scenario.floors.some(
-    (floor: any) => floor.floorNumber === floorData.floorNumber
+    (floor: Floor) => floor.floorNumber === floorData.floorNumber
   );
 
   if (floorExists) {
@@ -92,7 +90,7 @@ export async function addFloor(
     scenario.floors.push(floorData);
     await scenarioCollection.updateOne(
       { _id: playerId },
-      { $set: { scenarios: playerData } },
+      { $set: { scenarios: [scenario] } },
       { upsert: true }
     );
 
@@ -114,17 +112,35 @@ export async function addBossFloor(
   console.log(
     `Setting up boss floor ${floorData.floorNumber} for scenario "${scenarioName}".`
   );
+  const dbFilter = { _id: playerId };
+  const playerData = await scenarioCollection.findOne(dbFilter);
+  console.log("lauerData;", playerData);
+  const scenario = playerData.scenarios.find(
+    (scenario: interfaceScenario) => scenario.name === scenarioName
+  );
+
+  if (!scenario) {
+    console.log(`Scenario "${scenarioName}" not found.`);
+    return;
+  }
+
+  const floorExists = scenario.floors.some(
+    (floor: Floor) => floor.floorNumber === floorData.floorNumber
+  );
+
+  if (floorExists) {
+    console.log(
+      `Floor ${floorData.floorNumber} already exists in scenario "${scenarioName}".`
+    );
+    return;
+  }
 
   // Assuming boss floor involves specific JSON data or configuration
   const bossFloorData = {
-    identifier: `Floor_${floorData.floorNumber}`,
-    uniqueIdentifier: "generated-id", // Replace with UUID generator if needed
+    identifier: `forest-region`,
+    uniqueIdentifier: "forest-region", // Replace with UUID generator if needed
     bgColor: "#696A79",
-    levelName: `Boss Floor ${floorData.floorNumber}`,
-    levelDescription: "A challenging boss floor.",
-    customFields: {
-      ...floorData,
-    },
+    ...floorData,
     entities: {
       monsters: [],
       npcs: [],
@@ -132,7 +148,13 @@ export async function addBossFloor(
       teleports: [],
     },
   };
-
+  scenario.floors.push(bossFloorData);
+  await scenarioCollection.updateOne(
+    { _id: playerId },
+    { $set: { scenarios: [scenario] } },
+    { upsert: true }
+  );
+  // add a mail here (with tutorial, only if first region)
   console.log(
     `Boss floor ${floorData.floorNumber} initialized:`,
     bossFloorData

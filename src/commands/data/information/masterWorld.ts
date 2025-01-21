@@ -16,31 +16,53 @@ import {
   generateEmbed,
   generateFloorDetailsEmbed,
 } from "./mapFunctions";
-import Battle from "../../adv/action/battle/battle";
+import Battle, { ExtendedEnemy } from "../../adv/action/battle/battle";
 import { Enemy } from "../../adv/action/battle/battle";
+import {
+  PlayerScenarioData,
+  interfaceScenario,
+} from "../../../data/mongo/scenarioInterface";
+import { handleAdventure } from "../../adv/action/movement/advClass";
 
 const db = mongoClient.db("Akaimnky");
-const collection: any = db.collection("worldMapCollection");
+const scenarioCollection: any = db.collection("scenarioData");
 const collection2: any = db.collection("akaillection");
 const masterCommand: Command = {
-  name: "masterCommand",
+  name: "worldmap",
   description: "Configure/fight most things about the scenarios.",
-  aliases: ["mc"],
+  aliases: ["wm"],
   async execute(
     client: ExtendedClient,
     message: Message<boolean>,
     args: string[]
   ): Promise<void> {
-    const playerId = message.author.id;
-    let playerProgress = await collection.findOne({
-      playerId,
-    });
-    let playerData = await collection2.findOne({ _id: playerId });
-
+    const playerId = { _id: message.author.id };
+    let playerProgress = await scenarioCollection.findOne(playerId);
+    let playerData = await collection2.findOne(playerId);
+    let isTrue: boolean;
+    let floorNum: number = 1;
+    let bossFloorBooleanReal: boolean = false;
+    let existScenario: interfaceScenario = {
+      id: "forest-region",
+      name: "Forest Region",
+      selected: true,
+      number: 1,
+      difficulties: ["Easy", "Normal", "Hard"],
+      claimedReward: false,
+      floors: [
+        {
+          floorNumber: 1,
+          miniboss: false,
+          boss: false,
+          rewarded: false,
+          cleared: false,
+        },
+      ],
+    };
     const scenario = scenarios[0]; // Default first scenario
-    const progress = playerProgress?.progress.find(
-      (p: any) => p.scenarioId === scenario.id
-    );
+    const progress = playerProgress?.scenarios.find((p: interfaceScenario) => {
+      return p.id === scenario.id;
+    });
 
     const embed = generateEmbed(scenario, progress, 0x00ff00);
 
@@ -87,7 +109,7 @@ const masterCommand: Command = {
       time: 600000,
     });
     let selectedScenario: any;
-    let thatArrayy: Enemy;
+    let thatArrayy: any;
     collector.on("collect", async (interaction) => {
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId === "select-region") {
@@ -95,9 +117,8 @@ const masterCommand: Command = {
           selectedScenario = scenarios.find(
             (s: Scenario) => s.id === selectedScenarioId
           );
-          console.log("scenario", selectedScenario.id);
-          const selectedProgress = playerProgress?.progress.find(
-            (p: any) => p.scenarioId === selectedScenarioId
+          const selectedProgress = playerProgress?.scenarios.find(
+            (p: interfaceScenario) => p.id === selectedScenarioId
           );
           const selectedFloorSelectMenu = createFloorSelectMenu(
             selectedScenario ? selectedScenario : scenarios[0]
@@ -122,13 +143,29 @@ const masterCommand: Command = {
             10
           );
           if (!selectedScenario) selectedScenario = scenarios[0];
-
+          existScenario = playerProgress.scenarios.find(
+            (scenario: interfaceScenario) => scenario.id === selectedScenario.id
+          );
+          let isFloorExisting;
+          console.log("selectedFlor:", selectedFloor);
+          console.log("existScen.flor:", existScenario.floors);
+          if (existScenario)
+            isFloorExisting = existScenario.floors[selectedFloor - 1];
+          console.log("existFkiir", existScenario.floors);
+          if (!isFloorExisting) isTrue = true;
+          else isTrue = false;
+          const thatTrue = existScenario.floors.length! < selectedFloor;
           console.log("selected scenario", selectedScenario);
           console.log("selectedFloor", selectedFloor);
-          const { embed, thatArray } = generateFloorDetailsEmbed(
-            selectedScenario,
-            selectedFloor
-          );
+
+          const { embed, thatArray, uhNumber, bossFloorBoolean } =
+            generateFloorDetailsEmbed(
+              selectedScenario,
+              selectedFloor,
+              thatTrue
+            );
+          bossFloorBooleanReal = bossFloorBoolean;
+          floorNum = uhNumber;
           thatArrayy = thatArray[0];
           console.log("thatArray:", thatArrayy);
           await interaction.update({
@@ -141,9 +178,33 @@ const masterCommand: Command = {
       if (interaction.isButton()) {
         switch (interaction.customId) {
           case "start-floor":
+            if (isTrue) {
+              interaction.reply({
+                content:
+                  "You have not unlocked that floor. please beat the previous floor to unlock this floor.",
+                ephemeral: true,
+              });
+              return;
+            }
+            if (bossFloorBooleanReal) {
+              await handleAdventure(
+                client,
+                message,
+                playerData,
+                selectedScenario
+              );
+              return;
+            }
             setTimeout(async () => {
               if (!thatArrayy) thatArrayy = scenarios[0].floors[0].enemies[0];
-              const battle = new Battle(playerData, thatArrayy, interaction);
+
+              thatArrayy = { ...thatArrayy, floorNum };
+              const battle = new Battle(
+                playerData,
+                thatArrayy,
+                interaction,
+                existScenario
+              );
               console.log("Starting battle...");
               await battle.startEmbed();
             }, 1000);

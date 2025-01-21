@@ -91,10 +91,10 @@ export const allEnemies: Enemy[] = [
       {
         type: "Wind",
         stats: {
-          hp: 10000,
-          attack: 100,
+          hp: 1000,
+          attack: 40,
           defense: 40,
-          speed: 95,
+          speed: 65,
           magic: 200,
         },
         abilities: ["Wind Spear", "Spear Swipe"],
@@ -115,10 +115,28 @@ export const allEnemies: Enemy[] = [
       {
         type: "Terra",
         stats: {
-          hp: 10000,
-          attack: 100,
+          hp: 1000,
+          attack: 50,
           defense: 40,
-          speed: 95,
+          speed: 55,
+          magic: 200,
+        },
+        abilities: ["Stinky Breath", "Sharp Bite"],
+        attackPattern: [
+          "Basic Attack",
+          "Basic Attack",
+          "Basic Attack",
+          "Sharp Bite",
+        ],
+        index: 3,
+      },
+      {
+        type: "Fire",
+        stats: {
+          hp: 1000,
+          attack: 50,
+          defense: 40,
+          speed: 55,
           magic: 200,
         },
         abilities: ["Stinky Breath", "Sharp Bite"],
@@ -138,6 +156,32 @@ export const allEnemies: Enemy[] = [
     element: [
       {
         type: "Fire",
+        stats: {
+          hp: 1000,
+          attack: 40,
+          defense: 40,
+          speed: 95,
+          magic: 200,
+        },
+        abilities: ["Splinter Attack"],
+        attackPattern: ["Basic Attack", "Splinter Attack"],
+        index: 4,
+      },
+      {
+        type: "Wind",
+        stats: {
+          hp: 1000,
+          attack: 100,
+          defense: 40,
+          speed: 95,
+          magic: 200,
+        },
+        abilities: ["Splinter Attack"],
+        attackPattern: ["Basic Attack", "Splinter Attack"],
+        index: 4,
+      },
+      {
+        type: "Water",
         stats: {
           hp: 1000,
           attack: 100,
