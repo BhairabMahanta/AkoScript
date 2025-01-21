@@ -1,12 +1,13 @@
 import { Enemy } from "../../commands/adv/action/battle/battle";
 
-interface Floor {
+export interface Floor {
   floorNumber: number;
   enemies: Enemy[]; // Enemies now contain a list of Enemy objects
   miniboss: boolean;
   boss: boolean;
   bosses?: string[];
   quests?: string[];
+  mobs?: { [key: string]: any }[];
   waves: number;
   rewards: string[];
 }
@@ -76,6 +77,7 @@ export const scenarios: Scenario[] = [
           },
         ],
         miniboss: true,
+        bosses: ["Giant Spider"],
         boss: false,
         waves: 2,
         rewards: ["Gold", "Rune"],
@@ -132,6 +134,10 @@ export const scenarios: Scenario[] = [
         ],
         quests: ["gather_ingredients"],
         bosses: ["Giant Spider"],
+        mobs: [
+          { name: "Wolf", element: "Fire" },
+          { name: "Treant", element: "Water" },
+        ],
         miniboss: false,
         boss: true,
         waves: 2,
