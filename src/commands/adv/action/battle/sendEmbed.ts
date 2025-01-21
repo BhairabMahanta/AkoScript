@@ -28,7 +28,6 @@ export class BattleEmbed {
   private battleEmbed: any;
   private battleLogs: any;
   private boss: any;
-  private mobInfo: any;
   private familiarInfo: any;
   private playerName: string;
 
@@ -38,13 +37,16 @@ export class BattleEmbed {
     this.battleEmbed = that.battleEmbed;
     this.battleLogs = that.battleLogs;
     this.boss = that.boss;
-    this.mobInfo = that.mobInfo;
     this.familiarInfo = that.familiarInfo;
     this.playerName = that.playerName;
   }
 
-  async sendInitialEmbed(currentTurn: any): Promise<any | undefined> {
+  async sendInitialEmbed(
+    currentTurn: any,
+    mobInfo2: any
+  ): Promise<any | undefined> {
     try {
+      console.log("this is being called sENDinitial Embed");
       this.battleEmbed = new EmbedBuilder()
         .setTitle(`Battle VS ${this.enemyDetails.name}`)
         .setFooter({ text: "You can run if you want lol no issues" })
@@ -92,7 +94,7 @@ export class BattleEmbed {
       } else if (this.enemyDetails.type === "mob") {
         let mobInfo = ""; // Initialize an empty string to store the info
         let enemyEmojis = "";
-        for (const mob of this.mobInfo) {
+        for (const mob of mobInfo2) {
           enemyEmojis += iconMap[mob.type];
           let buffIcons = "";
           let debuffIcons = "";
@@ -152,7 +154,11 @@ export class BattleEmbed {
           } ${familiar.stats.hp} ♥️ \n[2;36m [2;34m${familiar.attackBarEmoji} ${Math.floor(
             familiar.atkBar
           )} [2;34m [${buffIcons}${debuffIcons}] ${
-            currentTurn.name === familiar.name ? "☝️" : "🙋"
+            currentTurn.name === familiar.name
+              ? "☝️"
+              : familiar.stats.hp <= 0
+              ? "💀"
+              : "🙋"
           }\n\n`;
         }
 
@@ -175,7 +181,11 @@ export class BattleEmbed {
         }\n[2;32m ${this.player.hpBarEmoji} ${this.player.stats.hp} ♥️ \n[2;36m [2;34m${
           this.player.attackBarEmoji
         } ${Math.floor(this.player.atkBar)} [2;34m [${buffIcons}${debuffIcons}] ${
-          currentTurn.name === this.player.name ? "☝️" : "🙋"
+          currentTurn.name === this.player.name
+            ? "☝️"
+            : this.player.stats.hp <= 0
+            ? "💀"
+            : "🙋"
         }`;
 
         this.battleEmbed.addFields({

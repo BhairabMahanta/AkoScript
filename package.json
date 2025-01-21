@@ -20,12 +20,14 @@
     "cargo": "^0.8.0",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
+    "lodash": "^4.17.21",
     "mongodb": "^6.9.0",
     "mongoose": "^8.7.1",
     "sharp": "^0.33.5",
     "typescript": "^5.6.3"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.14",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0"
   }

@@ -67,11 +67,17 @@ const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
 import { BattleEmbed, iconMap } from "./sendEmbed";
 import { BattleBarManager } from "./fillBar";
 import { allEnemies } from "../../../data/monsterInfo/allEnemies";
-
+import { addFloor } from "../../../player/scenarioUpdate/scenarioFunctions";
+import { interfaceScenario } from "../../../../data/mongo/scenarioInterface";
+import { Scenario, scenarios } from "../../../../data/information/scenarios";
+export interface ExtendedEnemy extends Enemy {
+  floorNum: number;
+}
+import _ from "lodash";
 class Battle {
   private allEnemiesSource: typeof allEnemies;
   private bossSource: typeof bosses;
-  public enemyDetails: Enemy;
+  public enemyDetails: ExtendedEnemy;
   private message: any;
   private continue: boolean;
   public player: ExtendedPlayer;
@@ -117,8 +123,14 @@ class Battle {
   private initialisedEmbed: any;
   private barManager: BattleBarManager;
   private currentWave: number;
+  private selectedScenario: interfaceScenario;
 
-  constructor(player: ExtendedPlayer, enemy: Enemy, message: any) {
+  constructor(
+    player: ExtendedPlayer,
+    enemy: ExtendedEnemy,
+    message: any,
+    existScenario: interfaceScenario
+  ) {
     this.taunted = false;
     this.allEnemiesSource = JSON.parse(JSON.stringify(allEnemies));
     this.bossSource = JSON.parse(JSON.stringify(bosses));
@@ -130,6 +142,7 @@ class Battle {
     this.mobAIClass = null;
     this.mobs = [];
     this.deckRow = [];
+    this.selectedScenario = existScenario;
     this.abilityOptions = [];
     this.playerFamiliar = [];
     this.currentTurnId = null;
@@ -227,41 +240,7 @@ class Battle {
         });
       }
 
-      this.currentWave = 1; // Start with wave 1
-
-      // Load the first wave of enemies dynamically
-      const waveInfo = this.enemyDetails.waves[this.currentWave - 1].enemies;
-
-      this.mobInfo = this.mobs
-        .map((mob, index) => {
-          const mobData = this.allEnemiesSource.find(
-            (enemy) => enemy.name === mob.name && waveInfo.includes(mob.name)
-          );
-          if (!mobData) {
-            console.log(`No data found for mob: ${mob.name}`);
-            return null; // Or handle as needed
-          }
-          const elementData = mobData.element.find(
-            (el) => el.type === mob.element
-          );
-          if (!elementData) {
-            console.log(
-              `No element data found for ${mob.name} with type ${mob.element}`
-            );
-            return null; // Or handle as needed
-          }
-
-          return {
-            name: mobData.name,
-            type: mob.element,
-            stats: elementData.stats,
-            abilities: elementData.abilities,
-            attackPattern: elementData.attackPattern,
-          };
-        })
-        .filter((mob) => mob !== null);
-      this.mobAIClass = new MobAI(this, this.mobInfo[0]);
-      this.allEnemies.push(...this.mobInfo);
+      this.getNextWave();
 
       if (this.enemyDetails.type === "boss") {
         console.log("preTtygay;");
@@ -417,21 +396,19 @@ class Battle {
 
     await this.barManager.fillHpBars(this.characters);
     if (this.nextTurnHappenedCounter >= 1) await this.printBattleResult();
-    console.log("this.currentTurn:", this.currentTurn.name);
+
     await new Promise((resolve) => setTimeout(resolve, 500));
     await this.performEnemyTurn();
-    console.log("Happening2nextTurn");
+
     this.nextTurnHappenedCounter++;
     return nextTurn;
   }
 
   async performEnemyTurn(): Promise<void> {
     // Ensure the current turn belongs to an enemy
-    console.log("Happening1Enemy");
-    const currentEnemy = this.allEnemies.find(
-      (enemy) =>
-        enemy.name === this.currentTurn.name &&
-        !this.deadEnemies.includes(enemy.name)
+
+    const currentEnemy = this.aliveEnemies.find(
+      (enemy) => enemy.name === this.currentTurn.name
     );
 
     if (!currentEnemy) {
@@ -740,10 +717,9 @@ class Battle {
       moveFinder = this.currentTurn.ability.map((abilityName: string) =>
         getAbilities(abilityName)
       );
-      console.log("AHAHHAHAHA ITS HERE");
+
       hahaThatIsTrue = true;
     } else if (this.currentTurn.name === this.player.name) {
-      console.log("wellNOTHERE");
       playerAbility = classes[this.player.class].abilities;
       moveFinder = playerAbility.map((abilityName: string) =>
         getPlayerMoves(abilityName)
@@ -823,7 +799,24 @@ class Battle {
       value: `enemy_${index}`,
     }));
     let rows: any;
+    // Add a fallback option if no valid options exist
+    if (this.pickEnemyOptions.length === 0) {
+      this.pickEnemyOptions.push({
+        label: "No Targets",
+        description: "No enemies available to attack.",
+        value: "no_target",
+      });
+    }
+
     try {
+      // Add fallback for abilityOptions
+      if (this.abilityOptions.length === 0) {
+        this.abilityOptions.push({
+          label: "No Abilities",
+          description: "No abilities available.",
+          value: "no_ability",
+        });
+      }
       this.selectMenu = new StringSelectMenuBuilder()
         .setCustomId("action_select")
         .setPlaceholder("Select the target")
@@ -850,11 +843,8 @@ class Battle {
 
   async printBattleResult(): Promise<void> {
     let updatedEmbed;
-    for (const character of this.allEnemies) {
-      if (
-        character.stats.hp < 0 &&
-        !this.deadEnemies.includes(character.name)
-      ) {
+    for (const character of this.aliveEnemies) {
+      if (character.stats.hp < 0) {
         this.battleLogs.push(`${character.name} died poggers`);
         character.stats.speed = 0;
         character.atkBar = 0;
@@ -882,79 +872,110 @@ class Battle {
     }
 
     if (this.aliveEnemies.length === 0) {
-      const rewards = this.enemyDetails.rewards;
-      if (this.player.activeQuests) {
-        for (const activeQuestName in this.player.activeQuests) {
-          if (this.player.activeQuests.hasOwnProperty(activeQuestName)) {
-            const activeQuestDetails = quests[activeQuestName];
-            const activeQuestDetails2 =
-              this.player.activeQuests[activeQuestName];
-            console.log(`stuffHere: ${activeQuestDetails.title}`);
-            console.log(`stuffHere: ${activeQuestDetails2.objectives[0]}`);
-          }
-        }
-      }
-
-      this.mobs.forEach((mobName) => {
-        for (const questName in this.player.activeQuests) {
-          if (this.player.activeQuests.hasOwnProperty(questName)) {
-            const objectives = this.player.activeQuests[questName].objectives;
-
-            // Iterate through all objective elements
-            for (const objective of objectives) {
-              console.log("objectiveNameTargetnotMatch:", objective.target);
-              if (objective.target === mobName) {
-                console.log("objectiveNameTarget:", objective.target);
-                // Match found, increment objective.current by 1
-                objective.current = objective.current + 1;
-                console.log("thisisobjective.current:", objective.current);
-              }
+      if (this.getNextWave() === true) {
+        const rewards = this.enemyDetails.rewards;
+        if (this.player.activeQuests) {
+          for (const activeQuestName in this.player.activeQuests) {
+            if (this.player.activeQuests.hasOwnProperty(activeQuestName)) {
+              const activeQuestDetails = quests[activeQuestName];
+              const activeQuestDetails2 =
+                this.player.activeQuests[activeQuestName];
+              console.log(`stuffHere: ${activeQuestDetails.title}`);
+              console.log(`stuffHere: ${activeQuestDetails2.objectives[0]}`);
             }
           }
         }
-      });
 
-      try {
-        const filter = { _id: this.player._id };
-        const playerData2 = await collection.findOne(filter);
-        if (playerData2) {
-          // Create an object with only the xp property to update
-          const updates = {
-            $inc: {
-              "exp.xp": rewards.experience,
-              "balance.coins": rewards.gold,
-            },
-            $set: { activeQuests: this.player.activeQuests },
-          };
-          console.log("rewards.xpereince:", rewards.experience);
-          // Update the player's document with the xpUpdate object
-          await collection.updateOne(filter, updates);
+        this.mobs.forEach((mobName) => {
+          for (const questName in this.player.activeQuests) {
+            if (this.player.activeQuests.hasOwnProperty(questName)) {
+              const objectives = this.player.activeQuests[questName].objectives;
 
-          console.log("Player XP updated:", updates);
-        } else {
-          console.log("Player not found or updated.");
+              // Iterate through all objective elements
+              for (const objective of objectives) {
+                console.log("objectiveNameTargetnotMatch:", objective.target);
+                if (objective.target === mobName) {
+                  console.log("objectiveNameTarget:", objective.target);
+                  // Match found, increment objective.current by 1
+                  objective.current = objective.current + 1;
+                  console.log("thisisobjective.current:", objective.current);
+                }
+              }
+            }
+          }
+        });
+
+        try {
+          const filter = { _id: this.player._id };
+          const playerData2 = await collection.findOne(filter);
+          if (playerData2) {
+            // Create an object with only the xp property to update
+            const updates = {
+              $inc: {
+                "exp.xp": rewards.experience,
+                "balance.coins": rewards.gold,
+              },
+              $set: { activeQuests: this.player.activeQuests },
+            };
+            console.log("rewards.xpereince:", rewards.experience);
+            // Update the player's document with the xpUpdate object
+            await collection.updateOne(filter, updates);
+
+            console.log("Player XP updated:", updates);
+          } else {
+            console.log("Player not found or updated.");
+          }
+        } catch (error) {
+          console.error("Error updating player XP:", error);
         }
-      } catch (error) {
-        console.error("Error updating player XP:", error);
-      }
-      console.log("thisplayeractiveQuest:", this.player.activeQuests);
+        console.log("thisplayeractiveQuest:", this.player.activeQuests);
 
-      this.battleEmbed.setFields({
-        name: "You won the battle against the Monster, you can continue the journey where you left off (I lied you can't)!!",
-        value: `Rewards:\n Exp: ${rewards.experience}, Gold: ${rewards.gold}`,
-        inline: true,
-      });
-      this.battleEmbed.setDescription("GGs You've won");
-      this.initialMessage.edit({
-        embeds: [this.battleEmbed],
-        components: [],
-      });
+        this.battleEmbed.setFields({
+          name: "You won the battle against the Monster, you can continue the journey where you left off (I lied you can't)!!",
+          value: `Rewards:\n Exp: ${rewards.experience}, Gold: ${rewards.gold}`,
+          inline: true,
+        });
+        this.battleEmbed.setDescription("GGs You've won");
+        this.initialMessage.edit({
+          embeds: [this.battleEmbed],
+          components: [],
+        });
+        const selectedScenario = scenarios.find((scenario: Scenario) => {
+          return scenario.id === this.selectedScenario.id;
+        });
+        if (selectedScenario) {
+          console.log("enemyDetails.FloorNum", this.enemyDetails.floorNum);
+          const nextFloor = selectedScenario.floors[this.enemyDetails.floorNum];
+          console.log("selectedScenario", selectedScenario);
+          console.log("nextFloor:", nextFloor);
+          console.log("this.player.id", this.player.id);
+          await addFloor(this.player._id, this.selectedScenario.name, {
+            floorNumber: nextFloor.floorNumber,
+            miniboss: nextFloor.miniboss,
+            boss: nextFloor.boss,
+            rewarded: false,
+            cleared: false,
+          });
+        }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
+          this.currentTurn,
+          this.mobInfo
+        );
+        this.initialMessage.edit({
+          embeds: [updatedEmbed],
+          components: await this.getDuelActionRow(),
+        });
+      }
     } else if (this.player.stats.hp < 0) {
       this.message.channel.send("You lost, skill issue.");
       this.player.stats.speed = 0;
     } else {
       updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
-        this.currentTurn
+        this.currentTurn,
+        this.mobInfo
       );
       this.initialMessage.edit({
         embeds: [updatedEmbed],
@@ -990,7 +1011,8 @@ class Battle {
     console.log("currentTurn:", this.currentTurn.name);
 
     this.initialMessage = await this.initialisedEmbed.sendInitialEmbed(
-      this.currentTurn
+      this.currentTurn,
+      this.mobInfo
     );
 
     this.initialMessage = await (message.channel as TextChannel).send({
@@ -1001,7 +1023,8 @@ class Battle {
     if (this.enemyFirst) {
       this.printBattleResult();
       const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
-        this.currentTurn
+        this.currentTurn,
+        this.mobInfo
       );
       await this.initialMessage.edit({
         embeds: [updatedEmbed],
@@ -1058,8 +1081,6 @@ class Battle {
   }
   async handleStarterSelection(i: any) {
     const selectedClassValue = i.values[0];
-
-    console.log("selectedClassValue:", selectedClassValue);
 
     if (selectedClassValue.startsWith("selection-")) {
       try {
@@ -1174,7 +1195,8 @@ class Battle {
             await this.getNextTurn();
 
             const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
-              this.currentTurn
+              this.currentTurn,
+              this.mobInfo
             );
           } catch (error) {
             console.error("Modal submission timed out or was invalid:", error);
@@ -1211,7 +1233,6 @@ class Battle {
     } else if (selectedClassValue.startsWith("ability-")) {
       await i.deferUpdate();
       if (this.pickedChoice || this.aliveEnemies.length === 1) {
-        console.log("THIS CANNOT BE TRUE");
         this.pickedChoice = true;
 
         if (this.aliveEnemies.length === 1) {
@@ -1235,7 +1256,8 @@ class Battle {
 
           // this.printBattleResult();
           const updatedEmbed = await this.initialisedEmbed.sendInitialEmbed(
-            this.currentTurn
+            this.currentTurn,
+            this.mobInfo
           );
         } catch (error) {
           console.error("Error on hit:", error);
@@ -1316,6 +1338,82 @@ class Battle {
 
     return targets.includes(null) ? null : targets;
   }
+  getNextWave(): Boolean {
+    console.log("Next wave happening");
+    this.currentWave += 1;
+    if (this.currentWave > this.enemyDetails.waves.length) {
+      console.log("No more waves available.");
+      return true;
+    }
+
+    // Get current wave's enemy data
+    const waveInfo = this.enemyDetails.waves[this.currentWave - 1].enemies;
+
+    this.mobInfo = this.mobs
+      .map((mob, index) => {
+        const mobData = this.allEnemiesSource.find(
+          (enemy) => enemy.name === mob.name && waveInfo.includes(mob.name)
+        );
+        if (!mobData) {
+          console.log(`No data found for mob: ${mob.name}`);
+          return null;
+        }
+
+        const elementData = mobData.element.find(
+          (el) => el.type === mob.element
+        );
+        if (!elementData) {
+          console.log(
+            `No element data found for ${mob.name} with type ${mob.element}`
+          );
+          return null;
+        }
+        return {
+          name: _.cloneDeep(mobData.name),
+          type: _.cloneDeep(mob.element),
+          stats: _.cloneDeep(elementData.stats),
+          abilities: _.cloneDeep(elementData.abilities),
+          attackPattern: _.cloneDeep(elementData.attackPattern),
+        };
+      })
+      .filter((mob) => mob !== null);
+
+    this.characters = this.characters.filter(
+      (char) => !this.allEnemies.some((enemy) => enemy.name === char.name) // Remove old enemies
+    );
+    this.allEnemies = [];
+    this.characters.push(...this.mobInfo); // Add new enemies
+
+    this.characters.push(...this.mobInfo);
+
+    // Initialize AI for the new wave
+    this.mobAIClass = new MobAI(this, this.mobInfo[0]);
+
+    // Add the new mob info to allEnemies
+    this.allEnemies.push(...this.mobInfo);
+    this.aliveEnemies = this.allEnemies.flat();
+
+    for (const character of this.allEnemies) {
+      try {
+        character.maxHp = character.stats.hp;
+      } catch (error) {
+        console.log("fillBarError:", error);
+      }
+      character.atkBar = 0;
+      character.attackBarEmoji = [];
+      character.hpBarEmoji = [];
+      character.statuses = {
+        buffs: [],
+        debuffs: [],
+      };
+    }
+    this.barManager.fillHpBars(this.aliveEnemies);
+    console.log("they have bars now");
+
+    // console.log("Wave updated. Current characters:", this.characters);
+    return false;
+  }
+
   // Inside the Battle class, but outside startBattle method
 }
 
