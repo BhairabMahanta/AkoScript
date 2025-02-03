@@ -19,19 +19,28 @@ import {
   MessageActionRowComponentBuilder,
 } from "discord.js";
 import { connectToDB, mongoClient } from "./data/mongo/mongo";
-import { CommandHandler } from "./events/handlers/commandHandler";
+import {
+  BotConfig,
+  CommandHandler,
+  GuildSettingsModel,
+} from "./events/handlers/commandHandler";
 // import { loadCommands } from "./handler.js";
 import path from "path";
 import fs from "fs";
 import { MongoClient } from "mongodb";
-
+import { Command } from "./events/handlers/commandHandler";
 export class ExtendedClient extends Client {
-  commands: Collection<string, any>;
-  interactions: Collection<string, any>;
+  config: BotConfig;
+  commands: Collection<string, Command>;
+  commandCategories: Map<string, Command[]>;
+  interactions: Collection<string, Command>;
+  generateHelpEmbed: any;
   safemode: boolean;
-  db: any;
+  db: {
+    GuildSettings: typeof GuildSettingsModel;
+  };
 
-  constructor() {
+  constructor(config: BotConfig) {
     super({
       shards: "auto",
       intents: [
@@ -42,23 +51,36 @@ export class ExtendedClient extends Client {
         GatewayIntentBits.GuildMembers,
       ],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+      rest: {
+        timeout: 30000, // 30 seconds timeout
+      },
     });
+
+    this.config = config;
     this.commands = new Collection();
+    this.commandCategories = new Map();
+    this.generateHelpEmbed = null;
     this.interactions = new Collection();
     this.safemode = false;
-    this.db = null;
+    this.db = {
+      GuildSettings: GuildSettingsModel,
+    };
+  }
+  async reloadCommand(commandName: string): Promise<void> {
+    try {
+      console.log(`Reloading command: ${commandName}`);
+      // Add your reload command logic here
+    } catch (error) {
+      console.error(`Failed to reload command ${commandName}:`, error);
+    }
   }
 }
+import { CONFIG } from "./config";
 
-const client = new ExtendedClient();
-
-const db = mongoClient.db("Akaimnky");
-const collection = db.collection("akaillection");
-
-// client.db = null;
+const client = new ExtendedClient(CONFIG);
 
 const BOT_PREFIX = "a!";
-const commandHandler = new CommandHandler(client);
+const commandHandler = new CommandHandler(client, CONFIG);
 commandHandler.loadCommands();
 
 // Interaction handler
@@ -66,10 +88,6 @@ import interactionHandler from "./events/handlers/interactionHandler";
 import { checkQuestCompletion } from "./commands/util/glogic";
 
 client.on(Events.InteractionCreate, interactionHandler);
-interface Command {
-  name: string;
-  execute: (message: Message, args: string[]) => void;
-}
 
 interface Event {
   name: string;
@@ -111,8 +129,6 @@ client.on("ready", async () => {
   console.log(`${client.user?.tag} is ready! 🚀`);
   const db = await connectToDB(); // Connect to MongoDB when the bot is ready
   updateStatus("Akai is breaking stuff again.");
-
-  client.db = db;
 });
 
 setInterval(checkQuestCompletion, 10000 * 60);
