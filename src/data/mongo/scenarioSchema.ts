@@ -26,15 +26,11 @@ const PlayerScenarioProgressSchema = new Schema<IPlayerScenarioProgress>({
   ],
 });
 
-const worldMapModel = async (
-  db: mongoose.Connection,
-  collectionName: string
-): Promise<Model<IPlayerScenarioProgress>> => {
-  return db.model<IPlayerScenarioProgress>(
+const worldMapModel: Model<IPlayerScenarioProgress> =
+  mongoose.model<IPlayerScenarioProgress>(
     "PlayerScenarioProgress",
     PlayerScenarioProgressSchema,
-    collectionName
+    "PlayerScenarioProgress"
   );
-};
 
 export { worldMapModel, IPlayerScenarioProgress };

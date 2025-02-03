@@ -124,6 +124,7 @@ interface Player extends Document {
   selectedFamiliars: {
     name: SelectedFamiliar[];
   };
+  mail: Mail[];
   quests: string[]; // Array of quest names
   activeQuests: {
     [key: string]: {
@@ -153,6 +154,13 @@ const MoveSchema = new Schema<Move>({
   cooldown: { type: Number, required: true },
   level: { type: Number, required: true },
 });
+interface Mail extends Document {
+  id: string;
+  read: boolean;
+  sentAt: number;
+  expiresAt?: number;
+  rewardClaimed: boolean;
+}
 // Define the player schema
 const playerSchema: Schema<Player> = new Schema<Player>(
   {
@@ -181,6 +189,15 @@ const playerSchema: Schema<Player> = new Schema<Player>(
       divinePower: { type: Number, required: true },
       potential: { type: Number, required: true },
     },
+    mail: [
+      {
+        id: { type: String, required: true },
+        read: { type: Boolean, default: false },
+        sentAt: { type: Number, required: true },
+        expiresAt: { type: Number },
+        rewardClaimed: { type: Boolean, default: false },
+      },
+    ],
     balance: {
       coins: { type: Number, required: true },
       gems: { type: Number, required: true },
@@ -297,5 +314,10 @@ async function playerModel(
 ): Promise<Model<Player>> {
   return db.model<Player>("akaillection", playerSchema, collectionName);
 }
+export const PlayerModal: Model<Player> = mongoose.model<Player>(
+  "Player",
+  playerSchema,
+  "akaillection"
+);
 
 export { playerModel, Player };

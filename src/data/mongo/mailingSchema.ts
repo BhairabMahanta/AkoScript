@@ -26,7 +26,7 @@ interface Mail extends Document {
 
 const mailSchema = new Schema<Mail>({
   id: { type: String, required: true },
-  recipientId: { type: String, required: true },
+  recipientId: { type: String },
   subject: { type: String, required: true },
   message: { type: String, required: true },
   rewards: {
@@ -46,6 +46,10 @@ const mailSchema = new Schema<Mail>({
   targetGroup: { type: [String], default: null },
 });
 
-const MailModel: Model<Mail> = mongoose.model<Mail>("Mail", mailSchema);
+const MailModel: Model<Mail> = mongoose.model<Mail>(
+  "Mail",
+  mailSchema,
+  "mails"
+);
 
 export default MailModel;
