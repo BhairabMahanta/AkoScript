@@ -15,24 +15,25 @@ const mongoClient = new MongoClient(mongoURI, {
     deprecationErrors: true,
   },
 });
+const MONGO_URI =
+  process.env.MONGO_URI || "your_mongodb_connection_string_here";
 
-export async function connectToDB(): Promise<Connection | undefined> {
+export async function connectToDB(): Promise<void> {
   try {
     // Connect using MongoClient
     await mongoClient.connect();
     console.log("Connected to MongoDB (Client)");
 
-    // Connect using Mongoose
-    const db: Connection = mongoose.createConnection(mongoURI, {
+    mongoose.connect(MONGO_URI, {
       dbName: "Akaimnky",
+    } as mongoose.ConnectOptions);
+    mongoose.connection.on("connected", () => {
+      console.log("MongoDB connected successfully!");
     });
-
-    // Handle connection events
-    db.on("error", console.error.bind(console, "MongoDB connection error:"));
-    db.once("open", () => {
-      console.log("Connected to MongoDB (Mongoose)");
+    mongoose.connection.on("error", (err) => {
+      console.error("MongoDB connection error:", err);
     });
-    return db;
+    mongoose.set("debug", true); // Log MongoDB queries
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
   }
