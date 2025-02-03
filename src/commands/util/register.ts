@@ -13,7 +13,7 @@ import {
 } from "discord.js";
 import { mongoClient } from "../../data/mongo/mongo";
 import mongoose from "mongoose";
-import { playerModel } from "../../data/mongo/playerschema"; // Adjust the path to match your schema file location
+import { PlayerModal, playerModel } from "../../data/mongo/playerschema"; // Adjust the path to match your schema file location
 import { Tutorial } from "./tutorial.js";
 import * as fs from "fs";
 import players from "../../data/players.json";
@@ -45,9 +45,12 @@ const registerCommand: Command = {
     message: Message<boolean>,
     args: string[]
   ): Promise<void> {
-    const db = client.db;
-    const akaillection = "akaillection";
-    let Player = await playerModel(db, akaillection);
+    let player = await PlayerModal.findOne({ _id: message.author.id });
+    if (player) {
+      // If the player already exists, return a message indicating that they are already registered
+      (message.channel as TextChannel).send("You are already registered");
+      return;
+    }
 
     if (!startedTutorial.includes(message.author.id)) {
       if (!args[0] || args[0].length > 20 || args[0].length < 3) {
@@ -69,13 +72,15 @@ const registerCommand: Command = {
     console.log("characterName:", characterName);
 
     // Check if the character name already exists
-    const existingCharacter = Object.values(players).find(
-      (player) =>
-        (player as any).name.toLowerCase() === characterName.toLowerCase()
+    const existingCharacter = PlayerModal.find(
+      (player: any) => player.name.toLowerCase() === characterName.toLowerCase()
     );
 
     console.log("started:", startedTutorial);
-    if (existingCharacter && !startedTutorial.includes(message.author.id)) {
+    if (
+      (await existingCharacter) &&
+      !startedTutorial.includes(message.author.id)
+    ) {
       const existingNameErrorEmbed = new EmbedBuilder()
         .setColor(0x992e22)
         .setDescription(
@@ -90,17 +95,6 @@ const registerCommand: Command = {
       (message.channel as TextChannel).send({
         embeds: [existingNameErrorEmbed],
       });
-      return;
-    }
-
-    // Check if the user exists in the database
-    const userExists = await Player.exists({ _id: message.author.id });
-
-    // If the user exists, send a message
-    if (userExists) {
-      (message.channel as TextChannel).send(
-        "You have already Registered to the bot, please type a!help to know more."
-      );
       return;
     }
 
@@ -125,8 +119,9 @@ const registerCommand: Command = {
     const randomCardExperience = randomCardData.card.experience;
     const randomCardMoves = randomCardData.card.moves;
     const playerId = message.author.id;
+    // If the player does not exist, create a new player document
 
-    const playerData2 = new Player({
+    const playerData2 = new PlayerModal({
       _id: playerId,
       name: characterName,
       location: locations[0],
@@ -240,7 +235,7 @@ const registerCommand: Command = {
 
     // Save the player data to the database
     try {
-      if (!userExists) {
+      if (!player) {
         await playerData2.save();
         console.log("saved player data");
       }

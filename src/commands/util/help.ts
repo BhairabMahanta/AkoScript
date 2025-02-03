@@ -8,6 +8,7 @@ import {
   ButtonStyle,
   TextChannel,
   Interaction,
+  StringSelectMenuBuilder,
 } from "discord.js";
 import { ExtendedClient } from "../..";
 import { Command } from "../../@types/command";
@@ -24,7 +25,7 @@ const helpCommand: Command = {
   ): Promise<void> {
     try {
       const commands = client.commands as Map<string, Command>;
-      console.log("commands:", commands);
+      // console.log("commands:", commands);
       const perPage = 12; // Number of commands to display per page
       let page = parseInt(args[0]) || 1; // Get the requested page from arguments
 
@@ -45,10 +46,10 @@ const helpCommand: Command = {
         )
         .setTimestamp();
 
-      const fields = await getFieldsForPage(commands, page, perPage);
+      const { fields, row } = await getFieldsForPage(commands, page, perPage);
       helpEmbed.addFields(fields);
 
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId("previous")
           .setLabel("Previous")
@@ -65,38 +66,78 @@ const helpCommand: Command = {
 
       const sentMessage = await (message.channel as TextChannel).send({
         embeds: [helpEmbed],
-        components: [row],
+        components: [row2, row],
       });
 
       const collector = sentMessage.createMessageComponentCollector({
         filter: (interaction) =>
-          ["previous", "compact", "next"].includes(interaction.customId),
+          ["previous", "compact", "next", "help_category"].includes(
+            interaction.customId
+          ),
         time: 300000, // 300 seconds
         dispose: true,
       });
 
       collector.on("collect", async (interaction: Interaction) => {
-        if (!interaction.isButton()) return;
+        if (interaction.isButton()) {
+          if (interaction.customId === "previous") {
+            page = Math.max(page - 1, 1);
+            const { fields } = await getFieldsForPage(commands, page, perPage);
+            helpEmbed.setFields(fields);
+            await interaction.update({ embeds: [helpEmbed] });
+          } else if (interaction.customId === "next") {
+            page = Math.min(page + 1, totalPages);
+            const { fields } = await getFieldsForPage(commands, page, perPage);
+            helpEmbed.setFields(fields);
+            await interaction.update({
+              embeds: [helpEmbed],
+              components: [row2, row],
+            });
+          } else if (interaction.customId === "compact") {
+            const compactFields = await getCompactFields(commands);
+            helpEmbed.spliceFields(0, helpEmbed.data.fields?.length || 0); // Clear all fields
+            let description = "";
+            compactFields.forEach((field) => {
+              description += `${field.name}, `;
+            });
+            helpEmbed.setDescription(description);
+            await interaction.update({
+              embeds: [helpEmbed],
+              components: [row2, row],
+            });
+          }
+        } else if (interaction.isStringSelectMenu()) {
+          const selected = interaction.values[0];
+          let embed: EmbedBuilder;
 
-        if (interaction.customId === "previous") {
-          page = Math.max(page - 1, 1);
-          const updatedFields = await getFieldsForPage(commands, page, perPage);
-          helpEmbed.setFields(updatedFields);
-          await interaction.update({ embeds: [helpEmbed] });
-        } else if (interaction.customId === "next") {
-          page = Math.min(page + 1, totalPages);
-          const updatedFields = await getFieldsForPage(commands, page, perPage);
-          helpEmbed.setFields(updatedFields);
-          await interaction.update({ embeds: [helpEmbed] });
-        } else if (interaction.customId === "compact") {
-          const compactFields = await getCompactFields(commands);
-          helpEmbed.spliceFields(0, helpEmbed.data.fields?.length || 0); // Clear all fields
-          let description = "";
-          compactFields.forEach((field) => {
-            description += `${field.name}, `;
+          if (selected === "all") {
+            // Regenerate base embed
+            embed = client.generateHelpEmbed();
+          } else {
+            // Create category-specific embed
+            const commands = client.commandCategories.get(selected) || [];
+            embed = new EmbedBuilder()
+              .setColor("Aqua")
+              .setTitle(`${selected} Commands`)
+              .setDescription(
+                `Use ${client.config.defaultPrefix}help [command] for more info`
+              );
+
+            const commandList = commands
+              .filter((cmd) => !cmd.requiredRoles)
+              .map((cmd) => `• \`${cmd.name}\` - ${cmd.description}`)
+              .join("\n");
+
+            embed.addFields({
+              name: `**${selected}**`,
+              value: commandList || "No commands in this category",
+            });
+          }
+
+          await interaction.update({
+            embeds: [embed],
+            components: [row], // Keep the selector
           });
-          helpEmbed.setDescription(description);
-          await interaction.update({ embeds: [helpEmbed] });
         }
       });
     } catch (error) {
@@ -113,11 +154,37 @@ const helpCommand: Command = {
       const fields: { name: string; value: string; inline: boolean }[] = [];
 
       const commandsArray = Array.from(commands.values());
+      const categories = Array.from(client.commandCategories.keys());
+      const options = categories.map((category) => ({
+        label: category,
+        value: category,
+        description: `View ${category} commands`,
+      }));
+
+      // Add "All Commands" option
+      options.unshift({
+        label: "All Commands",
+        value: "all",
+        description: "View all available commands",
+      });
+
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("help_category")
+          .setPlaceholder("Select a category")
+          .addOptions(options)
+      );
 
       commandsArray.forEach((command, index) => {
-        if (index >= startIndex && index < endIndex) {
+        console.log("index:", index);
+        if (
+          index >= startIndex &&
+          index < endIndex &&
+          command.name != undefined
+        ) {
+          console.log("happened:", command.name);
           const field = {
-            name: `**__${index + 1}. ${command.name}__**`,
+            name: `**__${command.name}__**`,
             value: `**Description:** ${
               command.description || "No description provided"
             }\n**Aliases:** ${
@@ -132,7 +199,7 @@ const helpCommand: Command = {
         }
       });
 
-      return fields;
+      return { fields, row };
     }
 
     async function getCompactFields(commands: Map<string, Command>) {
