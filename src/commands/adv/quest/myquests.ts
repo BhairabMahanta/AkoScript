@@ -36,6 +36,7 @@ const playersFilePath: string = path.join(
 
 import { ExtendedClient } from "../../..";
 import { Player } from "../../../data/mongo/playerschema";
+import { mongoClient } from "../../../data/mongo/mongo";
 let startingThisQuest: any | null = null;
 let embed: any | undefined;
 let row: any | undefined;
@@ -44,6 +45,7 @@ let sentMessage: any;
 const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
   new ButtonBuilder().setStyle(1).setLabel("Go back").setCustomId("back")
 );
+const db = mongoClient.db("Akaimnky");
 const myQuestsCommand: Command = {
   name: "myquests",
   description: "View your selected quests",
@@ -53,9 +55,8 @@ const myQuestsCommand: Command = {
     message: Message<boolean>,
     args: string[]
   ): Promise<void> {
-    const db = client.db;
     const playerId = message.author.id;
-    const collection = db.collection("akaillection");
+    const collection: any = db.collection("akaillection");
     const dbFilter = { _id: playerId };
     const dbData: PlayerData = await collection.findOne(dbFilter);
     let actionRow: any | undefined;

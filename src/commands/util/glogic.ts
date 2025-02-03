@@ -65,6 +65,48 @@ function calculateDamageOld(
 }
 const baseAttack = 1340;
 const baseDefense = 50;
+export function parseQuotedArgs(input: string): string[] {
+  const args: string[] = [];
+  let currentArg = "";
+  let insideQuotes = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+
+    if (escapeNext) {
+      currentArg += char;
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      insideQuotes = !insideQuotes;
+      continue;
+    }
+
+    if (char === " " && !insideQuotes) {
+      if (currentArg) {
+        args.push(currentArg);
+        currentArg = "";
+      }
+      continue;
+    }
+
+    currentArg += char;
+  }
+
+  if (currentArg) {
+    args.push(currentArg);
+  }
+
+  return args;
+}
 
 // Loop for incrementing attack
 function runCalcDamageTest(): void {

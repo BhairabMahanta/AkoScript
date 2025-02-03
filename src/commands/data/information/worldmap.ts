@@ -21,9 +21,6 @@ const worldMapCommand: Command = {
     args: string[]
   ): Promise<void> {
     try {
-      const db = client.db;
-      const kollektion = "worldMapCollection";
-      const worldMap = await worldMapModel(db, kollektion);
       // Get player ID
       const playerId: String = message.author.id;
 
@@ -35,7 +32,7 @@ const worldMapCommand: Command = {
       // If no entry exists, create a new one with default values
       if (!playerProgress) {
         // Create a new player progress document
-        playerProgress = new worldMap({
+        playerProgress = new worldMapModel({
           playerId,
           progress: [
             {
