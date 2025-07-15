@@ -1,5 +1,12 @@
+//index.ts
+/*
 import * as dotenv from "dotenv";
 dotenv.config();
+
+import {
+  LoggingService,
+  GuildLogConfigModel,
+} from "./events/handlers/loggingService";
 import {
   Client,
   Message,
@@ -19,7 +26,7 @@ import {
 } from "discord.js";
 import { connectToDB, mongoClient } from "./data/mongo/mongo";
 import {
-  BotConfig,
+  Command,
   CommandHandler,
   GuildSettingsModel,
 } from "./events/handlers/commandHandler";
@@ -27,17 +34,19 @@ import {
 import path from "path";
 import fs from "fs";
 import { MongoClient } from "mongodb";
-import { Command } from "./events/handlers/commandHandler";
+import { BotConfig } from "./events/handlers/commandHandler";
 export class ExtendedClient extends Client {
   config: BotConfig;
   commands: Collection<string, Command>;
   commandCategories: Map<string, Command[]>;
-  interactions: Collection<string, SlashCommand>;
+  interactions: Collection<string, Command>;
   generateHelpEmbed: any;
   safemode: boolean;
   db: {
     GuildSettings: typeof GuildSettingsModel;
+    LogConfig: typeof GuildLogConfigModel; // Add this
   };
+  logger: LoggingService; // Add this
 
   constructor(config: BotConfig) {
     super({
@@ -63,7 +72,9 @@ export class ExtendedClient extends Client {
     this.safemode = false;
     this.db = {
       GuildSettings: GuildSettingsModel,
+      LogConfig: GuildLogConfigModel, // Add this
     };
+    this.logger = LoggingService.getInstance(); // Initialize logger
   }
   async reloadCommand(commandName: string): Promise<void> {
     try {
@@ -85,8 +96,6 @@ commandHandler.loadCommands();
 // Interaction handler
 import interactionHandler from "./events/handlers/interactionHandler";
 import { checkQuestCompletion } from "./commands/util/glogic";
-import { SlashCommand } from "./@types/command";
-import { SlashCommandHandler } from "./events/handlers/SlashCommandHandler";
 
 client.on(Events.InteractionCreate, interactionHandler);
 
@@ -97,16 +106,19 @@ interface Event {
 }
 client.on("messageCreate", async (message: Message): Promise<void> => {
   try {
-    if (message.content.toLowerCase().startsWith(`${BOT_PREFIX}`)) {
-      const args: string[] = message.content.slice(2).trim().split(/ +/);
-      const commandName: string | undefined = args.shift()?.toLowerCase();
-
-      console.log(`Received command: ${commandName}`);
-
-      commandHandler.handleCommand(message);
-    }
+    commandHandler.handleCommand(message);
+    //  }
   } catch (error) {
     console.log("Error handling command:", error);
+    // Log the error using the new system
+    client.logger.logCommand({
+      userId: message.author.id,
+      guildId: message.guild?.id,
+      command: "UNKNOWN",
+      args: [],
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 });
 
@@ -128,14 +140,13 @@ for (const file of eventFiles) {
 
 client.on("ready", async () => {
   console.log(`${client.user?.tag} is ready! 🚀`);
-  const db = await connectToDB(); // Connect to MongoDB when the bot is ready
-    // 👇 ADD THIS
-    const slashHandler = new SlashCommandHandler(client);
-    await slashHandler.loadSlashCommands();
+  console.log("db issue?");
+  await connectToDB();
+  console.log("notDBissue");
   updateStatus("Akai is breaking stuff again.");
 });
 
-setInterval(checkQuestCompletion, 10000 * 60);
+// setInterval(checkQuestCompletion, 10000 * 60);
 
 process.on("SIGINT", () => {
   updateStatus("Bot is restarting...")
@@ -162,6 +173,7 @@ client.on(Events.GuildCreate, () => updateStatus("Bot joined a new server."));
 client.on(Events.GuildDelete, () => updateStatus("Bot left a server."));
 
 async function updateStatus(message: string) {
+  console.log("HIIIIIII");
   if (!client.user) {
     console.log("Client user is not available");
     return;
@@ -199,3 +211,83 @@ client.login(process.env.TOKEN);
 
 // Export client if necessary
 export { client };
+*/
+
+//logging service.ts
+/*
+import mongoose from "mongoose";
+
+// Add to your interfaces
+interface CommandLog {
+  userId: string;
+  guildId?: string;
+  command: string;
+  args: string[];
+  timestamp: Date;
+  success: boolean;
+  error?: string;
+}
+
+interface GuildLogConfig extends mongoose.Document {
+  guildId: string;
+  loggingEnabled: boolean;
+  logChannel?: string;
+}
+
+// Logging schema
+const guildLogConfigSchema = new mongoose.Schema<GuildLogConfig>({
+  guildId: { type: String, required: true, unique: true },
+  loggingEnabled: { type: Boolean, default: false },
+  logChannel: { type: String },
+});
+
+export const GuildLogConfigModel = mongoose.model<GuildLogConfig>(
+  "GuildLogConfig",
+  guildLogConfigSchema
+);
+
+// Logging Service Class
+// Add to your existing schemas
+
+const commandLogSchema = new mongoose.Schema<CommandLog>({
+  userId: { type: String, required: true },
+  guildId: String,
+  command: { type: String, required: true },
+  args: { type: [String], default: [] },
+  timestamp: { type: Date, default: Date.now },
+  success: Boolean,
+  error: String,
+});
+
+export const CommandLogModel = mongoose.model<CommandLog>(
+  "CommandLog",
+  commandLogSchema
+);
+export class LoggingService {
+  private static instance: LoggingService;
+  private constructor() {}
+
+  static getInstance(): LoggingService {
+    if (!LoggingService.instance) {
+      LoggingService.instance = new LoggingService();
+    }
+    return LoggingService.instance;
+  }
+
+  async logCommand(entry: Omit<CommandLog, "timestamp">): Promise<void> {
+    const logEntry = new CommandLogModel({ ...entry, timestamp: new Date() });
+    await logEntry.save();
+  }
+
+  async getLogs(guildId: string, limit = 100): Promise<CommandLog[]> {
+    return CommandLogModel.find({ guildId })
+      .sort({ timestamp: -1 })
+      .limit(limit);
+  }
+
+  async isLoggingEnabled(guildId: string): Promise<boolean> {
+    const config = await GuildLogConfigModel.findOne({ guildId });
+    return config?.loggingEnabled || false;
+  }
+}
+*/

@@ -9,7 +9,11 @@ import {
 } from "discord.js";
 import { Command } from "../../../@types/command";
 import { ExtendedClient } from "../../..";
-import { Scenario, scenarios } from "../../../data/information/scenarios";
+import {
+  Floor,
+  Scenario,
+  scenarios,
+} from "../../../data/information/scenarios";
 import { mongoClient } from "../../../data/mongo/mongo";
 import {
   createFloorSelectMenu,
@@ -42,6 +46,7 @@ const masterCommand: Command = {
     let isTrue: boolean;
     let floorNum: number = 1;
     let bossFloorBooleanReal: boolean = false;
+    let selectFloor: any;
     let existScenario: interfaceScenario = {
       id: "forest-region",
       name: "Forest Region",
@@ -147,16 +152,14 @@ const masterCommand: Command = {
             (scenario: interfaceScenario) => scenario.id === selectedScenario.id
           );
           let isFloorExisting;
-          console.log("selectedFlor:", selectedFloor);
-          console.log("existScen.flor:", existScenario.floors);
+
           if (existScenario)
             isFloorExisting = existScenario.floors[selectedFloor - 1];
-          console.log("existFkiir", existScenario.floors);
+
           if (!isFloorExisting) isTrue = true;
           else isTrue = false;
           const thatTrue = existScenario.floors.length! < selectedFloor;
-          console.log("selected scenario", selectedScenario);
-          console.log("selectedFloor", selectedFloor);
+          selectFloor = selectedScenario.floors[selectedFloor - 1];
 
           const { embed, thatArray, uhNumber, bossFloorBoolean } =
             generateFloorDetailsEmbed(
@@ -167,7 +170,7 @@ const masterCommand: Command = {
           bossFloorBooleanReal = bossFloorBoolean;
           floorNum = uhNumber;
           thatArrayy = thatArray[0];
-          console.log("thatArray:", thatArrayy);
+
           await interaction.update({
             embeds: [embed],
             components: [regionSelectMenu, firstFloorSelectMenu, floorButtons],
@@ -187,18 +190,26 @@ const masterCommand: Command = {
               return;
             }
             if (bossFloorBooleanReal) {
+              interaction.deferUpdate();
+              setTimeout(async () => {
+                await sentMessage.delete();
+              }, 10);
               await handleAdventure(
                 client,
                 message,
                 playerData,
+                selectFloor,
                 selectedScenario
               );
+
               return;
             }
             setTimeout(async () => {
               if (!thatArrayy) thatArrayy = scenarios[0].floors[0].enemies[0];
 
               thatArrayy = { ...thatArrayy, floorNum };
+              console.log("thatArray:", thatArrayy);
+              console.log("existScenario:", existScenario);
               const battle = new Battle(
                 playerData,
                 thatArrayy,

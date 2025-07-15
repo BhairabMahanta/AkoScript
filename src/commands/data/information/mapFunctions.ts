@@ -88,41 +88,39 @@ interface FloorDetailsEmbedReturn {
 export const generateFloorDetailsEmbed = (
   scenario: Scenario,
   floorNumber: number,
-  thatTrue: Boolean
+  thatTrue: boolean
 ): FloorDetailsEmbedReturn => {
   const floor = scenario.floors[floorNumber - 1];
 
-  // Fetch enemy details
+  // If this is a boss floor, delegate to generateBossFloorDetailsEmbed
+  if (floor.boss) {
+    return generateBossFloorDetailsEmbed(scenario, floorNumber, thatTrue);
+  }
+
+  // Normal floor embed generation:
   const enemiesDetails = floor.enemies
     .map((enemy) => {
       const mob = allEnemies.find((m) => m.name === enemy.name);
       if (mob) {
-        // Extract the main enemy and allies from the `element` array
-
         // Main enemy stats
         const mainMob: any =
           mob.element.find((el) => el.type === enemy.element) || {};
         const mainIcon = iconMap[enemy.element] || "❓";
         const mainStats = mainMob.stats;
         const mainAbilities = mainMob.abilities;
-
         const mainAttackPattern = mainMob.attackPattern;
-        // Allies stats
         // Allies stats
         const allies = enemy.hasAllies
           .filter((allyName) => allyName.name !== "none") // Skip "none" entries
-          .map((allyName, index) => {
+          .map((allyName) => {
             const yanemi: any =
               allEnemies.find((ella) => ella.name === allyName.name) || {};
             const allyElement = allyName.element;
             const allyIcon = iconMap[allyElement] || "❓";
-            const allyDetails = yanemi.element.find((el: any) => {
-              console.log("el.type", el.type, "allyElement:", allyElement);
-              return el.type === allyElement;
-            });
-
+            const allyDetails = yanemi.element.find(
+              (el: any) => el.type === allyElement
+            );
             if (allyDetails) {
-              console.log("hahaBROOOOOO");
               const { stats } = allyDetails;
               return `${allyName.name} (${allyIcon}): 💚 ${
                 stats.hp ?? "?"
@@ -130,50 +128,103 @@ export const generateFloorDetailsEmbed = (
                 stats.speed ?? "?"
               }`;
             }
-            console.log("allyName:", allyName);
-            return `${allyName} (${allyIcon}): No stats available`;
+            return `${allyName.name} (${allyIcon}): No stats available`;
           });
 
         return `**${mob.name}** (${mainIcon}) : 💚 ${mainStats.hp ?? "?"} ⚔️ ${
           mainStats.attack ?? "?"
         } 🛡️ ${mainStats.defense ?? "?"} 🌬️ ${mainStats.speed ?? "?"}
-      🧎‍♂️ **Abilities:** ${mainAbilities.join(", ") || "None"}
-      🌊 **Waves:** ${enemy.waves
-        .map(
-          (wave) =>
-            `\n __Wave ${wave.waveNumber}:__ **${wave.enemies.join(", ")}**`
-        )
-        .join(" ")}
-      👥 **Allies:** ${allies.length ? allies.join("\n") : "None"}
-      🌀 **Attack Pattern:** ${mainAttackPattern.join(" > ") || "None"}
-      `;
+  🧎‍♂️ **Abilities:** ${mainAbilities.join(", ") || "None"}
+  🌊 **Waves:** ${enemy.waves
+    .map(
+      (wave) => `\n __Wave ${wave.waveNumber}:__ **${wave.enemies.join(", ")}**`
+    )
+    .join(" ")}
+  👥 **Allies:** ${allies.length ? allies.join("\n") : "None"}
+  🌀 **Attack Pattern:** ${mainAttackPattern.join(" > ") || "None"}
+  `;
       }
       return `**${enemy.name}**: Details not available.`;
     })
     .join("\n\n");
 
-  // Fetch miniboss or boss details
   const bossDetails =
     floor.miniboss || floor.boss
-      ? floor.bosses?.join(",") ?? "No MiniBoss on this floor."
+      ? floor.bosses?.join(", ") ?? "No MiniBoss on this floor."
       : "No miniboss found";
 
   return {
     embed: new EmbedBuilder()
       .setTitle(`Floor ${floorNumber} Details - __${scenario.name}__`)
       .setDescription(
-        `
-      **🏞️ Floor ${floorNumber} - ${thatTrue ? "🔒Locked" : "✅ Unlocked"}**  
+        `**🏞️ Floor ${floorNumber} - ${
+          thatTrue ? "🔒Locked" : "✅ Unlocked"
+        }**  
       
-      **👾 __Enemies__:**  ${enemiesDetails}
-      **👑 MiniBoss:**  
-      ${bossDetails}
+**👾 __Enemies__:**  ${enemiesDetails}
+**👑 MiniBoss:**  
+${bossDetails}
 
-      **🎁 Rewards:**  
-      ${floor.rewards.join(", ")}
-    `
+**🎁 Rewards:**  
+${floor.rewards.join(", ")}
+`
       )
       .setColor(0x00bfff),
+    thatArray: floor.enemies,
+    uhNumber: floor.floorNumber,
+    bossFloorBoolean: floor.boss,
+  };
+};
+
+export const generateBossFloorDetailsEmbed = (
+  scenario: Scenario,
+  floorNumber: number,
+  thatTrue: boolean
+): FloorDetailsEmbedReturn => {
+  const floor = scenario.floors[floorNumber - 1];
+
+  // For a boss floor, we omit waves and attack patterns.
+  const enemiesDetails = floor.enemies
+    .map((enemy) => {
+      const mob = allEnemies.find((m) => m.name === enemy.name);
+      if (mob) {
+        const mainMob: any =
+          mob.element.find((el) => el.type === enemy.element) || {};
+        const mainIcon = iconMap[enemy.element] || "❓";
+        const mainStats = mainMob.stats;
+        const mainAbilities = mainMob.abilities;
+        // No waves or attack patterns for boss floors.
+        return `**${mob.name}** (${mainIcon}) : 💚 ${mainStats.hp ?? "?"} ⚔️ ${
+          mainStats.attack ?? "?"
+        } 🛡️ ${mainStats.defense ?? "?"} 🌬️ ${mainStats.speed ?? "?"}
+  🧎‍♂️ **Abilities:** ${mainAbilities.join(", ") || "None"}`;
+      }
+      return `**${enemy.name}**: Details not available.`;
+    })
+    .join("\n\n");
+
+  const bossSection = `**🔥 Boss:** ${
+    floor.bosses?.join(", ") || "Boss details not available."
+  }`;
+
+  return {
+    embed: new EmbedBuilder()
+      .setTitle(`🔥 Boss Floor ${floorNumber} - ${scenario.name}`)
+      .setDescription(
+        `**🏞️ Floor ${floorNumber} - ${thatTrue ? "🔒Locked" : "✅ Unlocked"}**
+        
+**👾 Mobs:**  
+${enemiesDetails}
+
+${bossSection}
+
+**🎁 Rewards:**  
+${floor.rewards.join(", ")}
+
+Use the navigation buttons to interact with NPCs, clear quests, beat mobs or fight the boss!
+        `
+      )
+      .setColor(0xff4500),
     thatArray: floor.enemies,
     uhNumber: floor.floorNumber,
     bossFloorBoolean: floor.boss,

@@ -1,5 +1,5 @@
 // src/types/command.d.ts
-import { Client, Message, TextChannel, NewsChannel } from "discord.js";
+import { Client, Message, TextChannel, NewsChannel, SlashCommandBuilder, CommandInteraction } from "discord.js";
 import { ExtendedClient } from "..";
 export interface Command {
   name: string;
@@ -14,5 +14,12 @@ export interface Command {
     client: ExtendedClient,
     message: Message,
     args: string[]
+  ) => Promise<void>;
+}
+export interface SlashCommand {
+  data: SlashCommandBuilder;
+  execute: (
+    client: ExtendedClient,
+    interaction: CommandInteraction
   ) => Promise<void>;
 }

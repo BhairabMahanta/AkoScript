@@ -36,7 +36,13 @@ const adventureCommand: Command = {
       return;
     }
 
-    await handleAdventure(client, message, player, selectedLocation);
+    await handleAdventure(
+      client,
+      message,
+      player,
+      selectedLocation,
+      selectedLocation
+    );
   },
 };
 

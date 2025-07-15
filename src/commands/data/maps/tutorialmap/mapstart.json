@@ -1,22 +1,22 @@
 {
 	"identifier": "forest-region",
-	"uniqueIdentifer": "7c17f910-d7b0-11ee-b498-15f70fdc7219",
+	"uniqueIdentifier": "7c17f910-d7b0-11ee-b498-15f70fdc7219",
 	"x": -288,
 	"y": -32,
 	"width": 576,
 	"height": 576,
 	"bgColor": "#696A79",
 	"neighbourLevels": [],
-	"customFields" : {
-		"levelName" : "Forest Clearing",
-		"levelDescription" : "This is the first level of the game. It is a simple level with some entities and teleports.",
-		"levelType" : "Level",
-		"levelDifficulty" : "Easy",
-		"levelHint" : "This is the first level of the game. It is a simple level with some entities and teleports.",
-		"levelObjective" : "This is the first level of the game. It is a simple level with some entities and teleports.",
-		"levelObjectiveHint" : "This is the first level of the game. It is a simple level with some entities and teleports.",
-		"levelObjectiveHint2" : "This is the first level of the game. It is a simple level with some entities and teleports.",
-		"levelObjectiveHint3" : "This is the first level of the game. It is a simple level with some entities and teleports."
+	"customFields": {
+	  "levelName": "Forest Clearing",
+	  "levelDescription": "This is the first level of the game. It is a simple level with some entities and teleports.",
+	  "levelType": "Boss Floor",
+	  "levelDifficulty": "Hard",
+	  "levelHint": "Defeat the boss to progress.",
+	  "levelObjective": "Defeat all waves and the boss.",
+	  "levelObjectiveHint": "Use fire attacks against the boss's weakness.",
+	  "levelObjectiveHint2": "Watch out for the boss's second phase.",
+	  "levelObjectiveHint3": "Try dodging the area-wide attack."
 	},
 	"layers": [
 		"Background.png",
@@ -37,11 +37,16 @@
 				"height": 16,
 				"color": 12470831,
 				"customFields" : {
-					"name": "monsterA",
+					"name": "Goblin",
 					"amount": 4,
 					"type": "mob",
-					"hasAllies": ["none"],
-					"waves": 2,
+					"hasAllies": [{ "name": "Wolf", "element": "Terra" }],
+					"waves": [
+						{
+						  "waveNumber": 1,
+						  "enemies": ["Goblin", "Wolf"]
+						}
+					  ],
 					"rewards": {
 					"experience": 300,
 					"gold": 100,
@@ -63,7 +68,12 @@
 					"amount": 4,
 					"type": "mob",
 					"hasAllies": ["none"],
-					"waves": 2,
+					"waves": [
+						{
+						  "waveNumber": 1,
+						  "enemies": ["monsterA"]
+						}
+					  ],
 					"rewards": {
 					"experience": 300,
 					"gold": 100,
@@ -85,7 +95,12 @@
 					"amount": 4,
 					"type": "mob",
 					"hasAllies": ["none"],
-					"waves": 2,
+					"waves": [
+						{
+						  "waveNumber": 1,
+						  "enemies": ["monsterA"]
+						}
+					  ],
 					"rewards": {
 					"experience": 300,
 					"gold": 100,
@@ -103,41 +118,99 @@
 				"height": 16,
 				"color": 12470831,
 				"customFields" : {
-					"name": "monsterA",
+					"name": "Goblin",
 					"amount": 4,
 					"type": "mob",
-					"hasAllies": ["none"],
-					"waves": 2,
+					"element": "Wind",
+					"hasAllies": [{ "name": "Wolf", "element": "Terra" }],
+					"waves": [
+						{
+						  "waveNumber": 1,
+						  "enemies": ["Goblin" ]
+						},
+						{
+						  "waveNumber": 2,
+						  "enemies": ["Goblin", "Wolf"]
+						}
+					],
 					"rewards": {
 					"experience": 300,
 					"gold": 100,
-					"items": { "Gold": 100}
+					"items": { "Gold": 100},
+					"floorNum": 4
 					}
 							}
 			},
 			{
 				"id": "Entity",
-				"iid": "b0a56880-d7b0-11ee-9604-217b96b489ac",
+				"iid": "8ef59930-d7b0-11ee-9604-97de6cbcef89",
 				"layer": "Entities",
-				"x": 448,
-				"y": 416,
+				"x": 272,
+				"y": 224,
 				"width": 16,
 				"height": 16,
 				"color": 12470831,
-				"customFields" : {
-					"name": "monsterA",
-					"amount": 4,
-					"type": "mob",
-					"hasAllies": ["none"],
-					"waves": 2,
-					"rewards": {
+				"customFields": {
+				  "name": "monsterA",
+				  "element": "Wind",
+				  "amount": 3,
+				  "floorNum": 4,
+				  "type": "mob",
+				  "waves": [
+					{
+					  "waveNumber": 1,
+					  "enemies": ["Goblin", "Wolf"]
+					},
+					{
+					  "waveNumber": 2,
+					  "enemies": ["Goblin"]
+					}
+				  ],
+				  "hasAllies": [
+					{ "name": "Wolf", "element": "Terra" }
+				  ],
+				  "rewards": {
 					"experience": 300,
 					"gold": 100,
-					"items": { "Gold": 100}
+					"items": { "Gold": 100 }
+				  }
+				}
+			  },
+			  {
+				"id": "Entity",
+				"iid": "ac249b50-d7b0-11ee-9604-f99eec436270",
+				"layer": "Entities",
+				"x": 192,
+				"y": 304,
+				"width": 16,
+				"height": 16,
+				"color": 12470831,
+				"customFields": {
+				  "name": "Treant",
+				  "element": "Earth",
+				  "amount": 2,
+				  "type": "mob",
+				  "waves": [
+					{
+					  "waveNumber": 1,
+					  "enemies": ["Treant", "Goblin"]
+					},
+					{
+					  "waveNumber": 2,
+					  "enemies": ["Treant"]
 					}
-							}
-			},
-			{
+				  ],
+				  "hasAllies": [
+					{ "name": "Goblin", "element": "Wind" }
+				  ],
+				  "rewards": {
+					"experience": 350,
+					"gold": 120,
+					"items": { "Gold": 100 }
+				  }
+				}
+			  },
+			  {
 				"id": "Entity",
 				"iid": "b1171610-d7b0-11ee-9604-81cad6428a1d",
 				"layer": "Entities",
@@ -146,19 +219,36 @@
 				"width": 16,
 				"height": 16,
 				"color": 12470831,
-				"customFields" : {
-					"name": "monsterA",
-					"amount": 4,
-					"type": "mob",
-					"hasAllies": ["none"],
-					"waves": 2,
-					"rewards": {
-					"experience": 300,
-					"gold": 100,
-					"items": { "Gold": 100}
+				"customFields": {
+				  "name": "Giant Spider",
+				  "element": "Poison",
+				  "amount": 1,
+				  "type": "boss",
+				  "waves": [
+					{
+					  "waveNumber": 1,
+					  "enemies": ["Treant", "Goblin"]
+					},
+					{
+					  "waveNumber": 2,
+					  "enemies": ["Wolf"]
+					},
+					{
+					  "waveNumber": 3,
+					  "enemies": ["Giant Spider"]
 					}
-							}
-			}
+				  ],
+				  "hasAllies": [
+					{ "name": "Treant", "element": "Earth" },
+					{ "name": "Goblin", "element": "Wind" }
+				  ],
+				  "rewards": {
+					"experience": 1000,
+					"gold": 500,
+					"items": { "Rare Equipment": 1, "Rune": 1 }
+				  }
+				}
+			  }
 		],
 		"Teleport": [
 			{

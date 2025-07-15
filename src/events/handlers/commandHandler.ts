@@ -13,6 +13,7 @@ import {
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
+import { SlashCommand } from "../../@types/command";
 
 // Database model for server-specific settings
 interface GuildSettings extends mongoose.Document {
@@ -62,7 +63,7 @@ export interface ExtendedClient extends Client {
   config: BotConfig;
   commands: Collection<string, Command>;
   commandCategories: Map<string, Command[]>;
-  interactions: Collection<string, Command>;
+  interactions: Collection<string, SlashCommand>;
   safemode: boolean;
   generateHelpEmbed: (command: Command, message: Message) => EmbedBuilder;
   db: {
@@ -322,23 +323,6 @@ export class CommandHandler {
     }
   }
 
-  // Handle interactions
-  async handleInteraction(interaction: CommandInteraction): Promise<void> {
-    if (!interaction.isCommand() || this.client.safemode) return;
-
-    const command = this.client.interactions.get(interaction.commandName);
-    if (!command) return;
-
-    try {
-      // await command.execute(this.client, Message, interaction);
-    } catch (error) {
-      console.error(`Interaction Error [${command.name}]:`, error);
-      interaction.reply({
-        content: "An error occurred while executing this interaction!",
-        ephemeral: true,
-      });
-    }
-  }
   private validateInput(
     command: Command,
     args: string[],

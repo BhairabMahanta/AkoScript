@@ -227,6 +227,9 @@ async function handleNavigation(
       dontGoThrough = true;
       await initialMessage.edit({ components: [] });
       const thatArray = gameImage.elementArray[0];
+      console.log("thatArray:", thatArray);
+
+      console.log("existScenario:", selectedLocation);
       setTimeout(async () => {
         const battle = new Battle(
           playerData2,

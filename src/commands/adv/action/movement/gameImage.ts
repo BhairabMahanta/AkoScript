@@ -81,9 +81,11 @@ class GameImage {
         y: entity.y,
         area: "tutorial",
         type: entity.customFields.type,
-        hasAllies: entity.customFields.hasAllies,
-        waves: entity.customFields.waves,
-        rewards: entity.customFields.rewards,
+        element: entity.customFields.element, // Ensure element is included
+        waves: entity.customFields.waves, // Keep waves properly structured
+        hasAllies: entity.customFields.hasAllies, // Include allies list
+        rewards: entity.customFields.rewards, // Include rewards (gold, xp, items)
+        floorNum: entity.customFields.floorNum, // Assuming floorNum is static, adjust if dynamic
       });
     });
 
@@ -342,49 +344,7 @@ class GameImage {
 
     return hahaTrueOrFalse;
   }
-  //   async deactivatedElements(): Promise<void> {
-  //     console.log("playerDATA:", this.playerData);
-  //     const result = await deactivatedElements(
-  //       this.playerData._id,
-  //       this.elements,
-  //       this.monsterArray,
-  //       this.npcArray
-  //     );
 
-  //     // Updating elements, monsterArray, and npcArray based on the result
-  //     this.elements = result.elements;
-  //     this.monsterArray = result.monsterArray;
-  //     this.npcArray = result.npcArray;
-  //   }
 
-  async generateRandomElements(
-    monsterProbability: number,
-    npcProbability: number,
-    maxElements: number
-  ): Promise<void> {
-    let monsterCount = 0;
-    let npcCount = 0;
-    console.log("imagew,h:", this.imgW, this.imgH);
-
-    for (let i = this.elements.length; i < maxElements; i++) {
-      const row = Math.floor(Math.random() * (this.imgH - 50)) + 50;
-      const col = Math.floor(Math.random() * (this.imgW - 50)) + 50;
-
-      if (this.getRandomBoolean(monsterProbability) && monsterCount < 7) {
-        this.elements.push({ name: `monster${i}`, x: col, y: row });
-        this.monsterArray.push({ name: `monster${i}`, x: col, y: row });
-        monsterCount++;
-      } else if (this.getRandomBoolean(npcProbability) && npcCount < 5) {
-        this.elements.push({ name: `npc${i}`, x: col, y: row });
-        this.npcArray.push({ name: `npc${i}`, x: col, y: row });
-        npcCount++;
-      }
-
-      // Stop adding elements once both monsterCount and npcCount exceed the threshold
-      if (monsterCount > 2 && npcCount > 2) {
-        break;
-      }
-    }
-  }
 }
 export { GameImage };

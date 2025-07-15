@@ -31,47 +31,27 @@ export class Adventure {
     message: Message<boolean>,
     initialMessage: any,
     player: any,
-    selectedLocaton: interfaceScenario,
-    stringMenuRow: any
+    selectedLocaton: any,
+    stringMenuRow: any,
+    selectedScenario: any
   ) {
-    const selectedLocation: Scenario =
-      scenarios.find((scenario) => scenario.id === selectedLocation.id) ??
+    const selectScenario: Scenario =
+      scenarios.find((scenario) => scenario.id === selectedScenario.id) ??
       scenarios[0];
-    let selectedFlooraaa: Floor =
-      selectedLocation.floors.find((floor: Floor) => floor.boss === true) ??
-      selectedLocation.floors[0];
     const adventureIntoEmbedConfirmation = new EmbedBuilder()
-      .setTitle(selectedLocation.name)
+      .setTitle(selectedScenario.name)
+      .setColor(0x7289da) // Discord blurple
       .setDescription(
-        "Do you want to go in? If you had any saved progress, you will spawn right there!"
-      )
-      .addFields(
-        {
-          name: "**Player Level**",
-          value: ` \`\`Level: ${player.exp.level}\`\`, Username: __${player.name}__ `,
-          inline: false,
-        },
-        // {
-        //   name: "**Level Restriction and Level Suggestion**",
-        //   value: `Area only for \`\`Level ${selectedLocation.requiredLevel}\`\` and Above!\n Suggested Level for this area is 'makeLevelSuggestion'`,
-        //   inline: false,
-        // },
-        {
-          name: "**Party recommended**",
-          value: `${selectedFlooraaa.mobs?.join("\n")}`,
-          inline: false,
-        },
-        {
-          name: "**Start Adventuring?**",
-          value: 'To start, click on the "Let’s Dive into it" button!!',
-          inline: false,
-        }
-        // {
-        //   name: "**Difficulty**",
-        //   value: `${selectedLocation.difficulty}`,
-        //   inline: false,
-        // }
+        `If you had any saved progress, you'll spawn right where you left off!
+    
+    **Player Info**
+    • **Level:** ${player.exp.level}
+    • **Username:** ${player.name}
+    
+    **Start Adventuring**
+    Click the **"Let’s Dive into it"** button to begin your journey!`
       );
+
     const confirmationRowTwo = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("go_in")
@@ -147,16 +127,22 @@ export class Adventure {
                   "More info About the available quests in this area!"
                 );
 
-              const availableQuests = selectedFlooraaa.quests?.map(
-                (questName) => quests[questName]
+              const availableQuests = selectedLocaton.quests?.map(
+                (questName: any) => quests[questName]
               );
 
               // Iterate over the available quests and modify the embed fields
-              availableQuests?.forEach((quest, index) => {
+              availableQuests?.forEach((quest: any, index: number) => {
+                console.log("quest.objectives:'", quest.objectives);
                 // Modify the existing fields or add new ones to the embedBuilder
                 questEmbed.addFields({
-                  name: ` ${index + 1} • ${quest.title}`,
-                  value: `Objective: ${quest.objectives}\nRewards: ${
+                  name: `${index + 1} • ${quest.title}`,
+                  value: `**Objectives:**\n${quest.objectives
+                    .map(
+                      (obj: any) =>
+                        `${obj.description}: ${obj.current}/${obj.required} (${obj.target})`
+                    )
+                    .join("\n")}\n**Rewards:** ${
                     quest.rewards[0].experience
                   } XP, ${quest.rewards[0].items.join(", ")}`,
                   inline: false,
@@ -167,7 +153,7 @@ export class Adventure {
               initialMessage.edit({
                 content: "",
                 embeds: [questEmbed],
-                components: [stringMenuRow], // Assuming you have navigationRow defined
+                components: [stringMenuRow, confirmationRowTwo], // Assuming you have navigationRow defined
               });
             } else if (selectedValueName === "bosses") {
               // Create options for classes
@@ -177,12 +163,12 @@ export class Adventure {
                   "More info About the available Bosses in this area!"
                 );
 
-              const availableBosses = selectedFlooraaa.bosses?.map(
-                (bossName) => bosses[bossName]
+              const availableBosses = selectedLocaton.bosses?.map(
+                (bossName: any) => bosses[bossName]
               );
 
               // Iterate over the available quests and modify the embed fields
-              availableBosses?.forEach((boss, index) => {
+              availableBosses?.forEach((boss: any, index: number) => {
                 // Modify the existing fields or add new ones to the embedBuilder
                 questEmbed.addFields({
                   name: ` ${index + 1} • ${boss.name}`,
@@ -193,9 +179,9 @@ export class Adventure {
                   }\n > Magial Stats: \n > MANA: ${
                     boss.stats.mana
                   }\n > Abilities: ${boss.abilities
-                    .map((abil) => `\`${abil}\``)
+                    .map((abil: any) => `\`${abil}\``)
                     .join(",  ")}\n > Attack Pattern: ${boss.attackPattern
-                    .map((atakPat) => `\'${atakPat}\'`)
+                    .map((atakPat: any) => `\'${atakPat}\'`)
                     .join(",  ")}`,
                   inline: false,
                 });
@@ -205,11 +191,11 @@ export class Adventure {
               initialMessage.edit({
                 content: "",
                 embeds: [questEmbed],
-                components: [stringMenuRow], // Assuming you have navigationRow defined
+                components: [stringMenuRow, confirmationRowTwo], // Assuming you have navigationRow defined
               });
             } else if (selectedValueName === "adventure") {
               initialMessage.edit({
-                content: `You are at: ${selectedLocation.name}\nDescription: ${selectedLocation.description}`,
+                content: `You are at: ${selectScenario.name}\nDescription: ${selectScenario.description}`,
                 embeds: [adventureIntoEmbedConfirmation],
                 components: [stringMenuRow, confirmationRowTwo],
               });
@@ -239,49 +225,41 @@ export async function handleAdventure(
   client: ExtendedClient,
   message: any,
   player: any,
-  selectedLocation: any
+  selectedLocation: any,
+  selectedScenario: any
 ): Promise<void> {
   const adventure = new Adventure(client);
 
   const adventureConfirmEmbed = new EmbedBuilder()
-    .setTitle(selectedLocation.name)
-    .setDescription("Know what this journey of yours has to offer!")
-    .addFields(
-      {
-        name: "**Quests**",
-        value:
-          selectedLocation.quests.length > 0
-            ? selectedLocation.quests
-                .map((quest: any) => `'${quest}'`)
-                .join(", ")
-            : "There are no quests.",
-        inline: false,
-      },
-      {
-        name: "**Bosses**",
-        value:
-          selectedLocation.bosses.length > 0
-            ? selectedLocation.bosses
-                .map((boss: any) => `\`${boss}\``)
-                .join(", ")
-            : "There are no bosses.",
-        inline: false,
-      },
-      {
-        name: "**Mobs**",
-        value: `${selectedLocation.mobs.join("\n")}`,
-        inline: false,
-      },
-      {
-        name: "**Adventure**",
-        value: "Go on the Adventure Lad!",
-        inline: false,
-      },
-      {
-        name: "**Difficulty**",
-        value: `${selectedLocation.difficulty[0]}`,
-        inline: false,
-      }
+    .setTitle("AKOBOT: BOSS FLOOR")
+    .setColor(0xff4500) // A fiery color, for example
+    .setDescription(
+      `**Know what this journey of yours has to offer!**
+
+**Quests:**  
+${
+  selectedLocation.quests.length > 0
+    ? selectedLocation.quests.map((quest: any) => `'${quest}'`).join(", ")
+    : "There are no quests."
+}
+
+**Bosses:**  
+${
+  selectedLocation.bosses.length > 0
+    ? selectedLocation.bosses.map((boss: any) => `\`${boss}\``).join(", ")
+    : "There are no bosses."
+}
+
+**Mobs:**  
+${selectedLocation.mobs
+  .map((mob: any) => `• ${mob.name} (${mob.element})`)
+  .join("\n")}
+
+**Adventure:**  
+Go on the Adventure Lad!
+
+**Difficulty:**  
+${selectedLocation.difficulty ? selectedLocation.difficulty[0] : "Easy"}`
     );
 
   const optionSelectMenu = new StringSelectMenuBuilder()
@@ -313,12 +291,13 @@ export async function handleAdventure(
     embeds: [adventureConfirmEmbed],
     components: [stringMenuRow, confirmationRow],
   });
-
+  console.log("gonehere");
   adventure.setupCollector(
     message,
     initialMessage,
     player,
     selectedLocation,
-    stringMenuRow
+    stringMenuRow,
+    selectedScenario
   );
 }

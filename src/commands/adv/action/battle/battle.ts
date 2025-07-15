@@ -1008,7 +1008,7 @@ class Battle {
 
     await this.getNextTurn();
     this.initialisedEmbed = new BattleEmbed(this);
-    console.log("currentTurn:", this.currentTurn.name);
+    console.log("currentTurn:", this.currentTurn);
 
     this.initialMessage = await this.initialisedEmbed.sendInitialEmbed(
       this.currentTurn,
@@ -1345,7 +1345,7 @@ class Battle {
       console.log("No more waves available.");
       return true;
     }
-
+    console.log("this.enemyDetails.waves:", this.enemyDetails )
     // Get current wave's enemy data
     const waveInfo = this.enemyDetails.waves[this.currentWave - 1].enemies;
 
