@@ -1,4 +1,4 @@
-import { ExtendedPlayer } from "../commands/gamelogic/buffDebuffManager";
+import { ExtendedPlayer } from "../commands/gamelogic/buffdebufflogic";
 
 export interface AbilityInterface {
   name: string; // Name of the ability
@@ -8,6 +8,7 @@ export interface AbilityInterface {
     | "attack_many" // Attack multiple targets
     | "increase_self"
     | "increase_hit"
+    | "increase_many"
     | "increase_many_hit" // Increase for many people and hit one target
     | "increase_many_hit_many" // Increase for many people and hit many targets
     | "decrease_hit"
@@ -436,18 +437,23 @@ const abilities: { [key: string]: AbilityInterface } = {
     cooldown: 2,
     type: "decrease_hit",
   },
-  "Aqua Blast": {
+   "Aqua Blast": {
     name: "Aqua Blast",
     description: "Blast your opponent with water",
-
     cooldown: 3,
-    type: "decrease_hit",
+    type: "attack",
   },
   "Healing Wave": {
-    name: "Healing Wave",
-    description: "Heal yourself with water energy",
-    cooldown: 4,
-    type: "decrease_hit",
+    description: "Freezes an enemy, slowing their movement and attack speed.",
+    name: "Ice Breath",
+    cooldown: 3,
+    type: "increase_many",
+    logicType: "increase_hp",
+    unique: true,
+    value_amount: {
+      speed: -0,
+    },
+    turnLimit: 1,
   },
   "Fire Breath": {
     name: "Fire Breath",

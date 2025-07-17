@@ -12,7 +12,7 @@ import { GameImage } from "./gameImage";
 import Battle from "../battle/battle";
 import { mongoClient } from "../../../../data/mongo/mongo";
 import { NPC } from "../../quest/npc";
-import { ExtendedPlayer } from "../../../gamelogic/buffDebuffManager";
+import { ExtendedPlayer } from "../../../gamelogic/buffdebufflogic";
 import { interfaceScenario } from "../../../../data/mongo/scenarioInterface";
 
 let updatedImageBuffer: any;

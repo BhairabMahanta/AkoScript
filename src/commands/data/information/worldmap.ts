@@ -85,7 +85,7 @@ const worldMapCommand: Command = {
                 `${enemy.name} ${
                   enemy.hasAllies.length > 0
                     ? `(Allies: ${enemy.hasAllies
-                        .map((ally) => ally.name)
+                        .map((ally:any) => ally.name)
                         .join(", ")})`
                     : ""
                 }`

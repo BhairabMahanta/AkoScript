@@ -1,50 +1,66 @@
-import { ExtendedPlayer } from "../../../gamelogic/buffDebuffManager";
+// ui/BattleBarManager.ts
+import { ExtendedPlayer } from "../../../gamelogic/buffdebufflogic";
 import {
   generateAttackBarEmoji,
   generateHPBarEmoji,
 } from "../../../util/glogic";
-interface battlePlayer extends ExtendedPlayer {
-  speedBuff: number;
+
+interface BattlePlayer extends ExtendedPlayer {
+  speedBuff?: boolean; // ✅ Fixed: Changed from number to boolean | undefined
   maxHp: number;
+  atkBar: number;
+  attackBarEmoji?: string;
+  hpBarEmoji?: string;
 }
+
 export class BattleBarManager {
   constructor() {}
 
-  async fillAtkBars(characters: battlePlayer[]): Promise<battlePlayer[]> {
-    const charactersWith100AtkBar: battlePlayer[] = [];
+  async fillAtkBars(characters: BattlePlayer[]): Promise<BattlePlayer[]> {
+    const charactersWith100AtkBar: BattlePlayer[] = [];
+    
     try {
       console.log("Starting fillAtkBars...");
 
+      // Filter out characters with no stats
+      const validCharacters = characters.filter(char => char && char.stats);
+      
+      if (validCharacters.length === 0) {
+        console.log("No valid characters for attack bar filling");
+        return [];
+      }
+
       // Sort characters by speed in descending order
-      characters.sort(
-        (a: battlePlayer, b: battlePlayer) => b.stats.speed - a.stats.speed
+      validCharacters.sort(
+        (a: BattlePlayer, b: BattlePlayer) => (b.stats?.speed || 0) - (a.stats?.speed || 0)
       );
 
       // Check if any character already has atkBar >= 100
-      for (const character of characters) {
-        if (character.atkBar >= 100) {
+      for (const character of validCharacters) {
+        if ((character.atkBar || 0) >= 100) {
           console.log("found atkBar >= 100 for:", character.name);
           charactersWith100AtkBar.push(character);
-          return charactersWith100AtkBar; // Exit early if any character has atkBar >= 100
+          return charactersWith100AtkBar;
         }
       }
 
       // Calculate the smallestFactor for all characters
-      const smallestFactor = characters.reduce((minFactor, character) => {
-        const speedMultiplier = character.speedBuff ? 1.3 : 1;
-        const toMinus = character.atkBar;
+      const smallestFactor = validCharacters.reduce((minFactor, character) => {
+        const speedMultiplier = character.speedBuff ? 1.3 : 1; // ✅ Now correctly uses boolean
+        const currentAtkBar = character.atkBar || 0;
+        const speed = character.stats?.speed || 1;
 
-        const factor =
-          (100 - toMinus) / (character.stats.speed * 0.05 * speedMultiplier);
-
+        const factor = (100 - currentAtkBar) / (speed * 0.05 * speedMultiplier);
         return Math.min(minFactor, factor);
       }, Infinity);
 
       // Update atkBar for all characters using smallestFactor
-      for (const character of characters) {
-        const speedMultiplier = character.speedBuff ? 1.3 : 1;
-        character.atkBar +=
-          smallestFactor * (character.stats.speed * 0.05 * speedMultiplier);
+      for (const character of validCharacters) {
+        const speedMultiplier = character.speedBuff ? 1.3 : 1; // ✅ Now correctly uses boolean
+        const speed = character.stats?.speed || 1;
+        const currentAtkBar = character.atkBar || 0;
+        
+        character.atkBar = currentAtkBar + (smallestFactor * (speed * 0.05 * speedMultiplier));
 
         if (character.atkBar >= 100) {
           charactersWith100AtkBar.push(character);
@@ -52,46 +68,53 @@ export class BattleBarManager {
       }
 
       // Generate attack bar emoji for each character
-      for (const character of characters) {
-        character.attackBarEmoji = await generateAttackBarEmoji(
-          character.atkBar
-        );
+      for (const character of validCharacters) {
+        try {
+          character.attackBarEmoji = await generateAttackBarEmoji(character.atkBar || 0);
+        } catch (error) {
+          console.log("Error generating attack bar emoji:", error);
+          character.attackBarEmoji = "░░░░░░░░░░"; // Fallback
+        }
       }
 
       if (charactersWith100AtkBar.length > 0) {
-        console.log(
-          "Processing characters with 100 atkBar:",
-          charactersWith100AtkBar[0].name
-        );
+        console.log("Processing characters with 100 atkBar:", charactersWith100AtkBar[0].name);
       }
     } catch (error) {
-      console.log("fillBarError:", error);
+      console.log("fillAtkBars error:", error);
     }
+    
     return charactersWith100AtkBar;
   }
 
-  async fillHpBars(characters: battlePlayer[]): Promise<void> {
+  async fillHpBars(characters: BattlePlayer[]): Promise<void> {
     try {
       console.log("Starting fillHpBars...");
+      
       for (const character of characters) {
-        const hp = await this.calculateOverallHp(character);
-        character.hpBarEmoji = await generateHPBarEmoji(
-          character.stats.hp,
-          character.maxHp
-        );
+        if (!character || !character.stats) continue;
+        
+        try {
+          character.hpBarEmoji = await generateHPBarEmoji(
+            character.stats.hp || 0,
+            character.maxHp || character.stats.hp || 1
+          );
+        } catch (error) {
+          console.log("Error generating HP bar emoji:", error);
+          character.hpBarEmoji = "▓▓▓▓▓▓▓▓▓▓"; // Fallback
+        }
       }
     } catch (error) {
-      console.log("fillBarError:", error);
+      console.log("fillHpBars error:", error);
     }
   }
 
-  async calculateOverallHp(
-    character: battlePlayer
-  ): Promise<number | undefined> {
+  async calculateOverallHp(character: BattlePlayer): Promise<number | undefined> {
     try {
-      return character.stats.hp;
+      return character.stats?.hp || 0;
     } catch (error) {
-      console.log("speedcalculator:", error);
+      console.log("calculateOverallHp error:", error);
+      return 0;
     }
   }
 }

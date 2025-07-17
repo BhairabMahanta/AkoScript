@@ -1,3 +1,4 @@
+// gamelogic/buffdebufflogic.ts
 import { Player, Stats } from "../../data/mongo/playerschema";
 import { critOrNot } from "../util/glogic";
 
@@ -6,11 +7,19 @@ interface Buff {
   description: string;
   effect: string;
 }
-interface ExtendedPlayer extends Player {
+
+export interface ExtendedPlayer extends Player {
   statuses: {
     buffs: BuffDetails[];
     debuffs: DebuffDetails[];
   };
+  attackBarEmoji?: string;
+  hpBar: number;
+  atkBar: number;
+  hpBarEmoji?: string;
+  maxHp: number;
+  speedBuff?: boolean;
+  isNPC?: boolean;
 }
 
 export const buffs: Record<string, Buff> = {
@@ -53,6 +62,7 @@ export const debuffs: Record<string, Buff> = {
     effect: "stun",
   },
 };
+
 export interface BuffDetails {
   type: string;
   name: string;
@@ -81,14 +91,11 @@ export interface DebuffDetails {
   targets: ExtendedPlayer | ExtendedPlayer[];
 }
 
-let that2: any;
-
 class BuffDebuffLogic {
-  battleLogs: string[];
+  private battle: any;
 
-  constructor(that: any) {
-    that2 = that;
-    this.battleLogs = that.battleLogs;
+  constructor(battle: any) {
+    this.battle = battle;
   }
 
   async overLogic(
@@ -96,22 +103,21 @@ class BuffDebuffLogic {
     buff: any,
     i: number,
     what: boolean
-  ) {
+  ): Promise<void> {
     let types: any;
     if (buff.type.includes("_and_")) types = buff.type.split("_and_");
     else types = [buff.type];
-    types.forEach((type: String) => {
+    
+    types.forEach((type: string) => {
       if (type.startsWith("increase_") || type.startsWith("decrease_")) {
         const attribute = type.split("_")[1];
         console.log("type:", type);
         if (buff.flat) {
-          turnEnder.stats[attribute as keyof Stats] -=
-            buff.value_amount[attribute];
+          turnEnder.stats[attribute as keyof Stats] -= buff.value_amount[attribute];
         } else {
           turnEnder.stats[attribute as keyof Stats] -=
             (turnEnder.stats[attribute as keyof Stats] *
-              (buff.value_amount as unknown as number)) /
-            100;
+              (buff.value_amount as unknown as number)) / 100;
         }
       }
     });
@@ -125,55 +131,53 @@ class BuffDebuffLogic {
   }
 
   // Example for increasing/decreasing various stats
-  async increaseAttack(target: Player, amount: number, flat: boolean) {
+  async increaseAttack(target: Player, amount: number, flat: boolean): Promise<void> {
     target.stats.attack += flat ? amount : target.stats.attack * (amount / 100);
   }
 
-  async decreaseAttack(target: Player, amount: number, flat: boolean) {
+  async decreaseAttack(target: Player, amount: number, flat: boolean): Promise<void> {
     target.stats.attack -= flat ? amount : target.stats.attack * (amount / 100);
   }
 
-  async increaseSpeed(target: Player, amount: number, flat: boolean) {
+  async increaseSpeed(target: Player, amount: number, flat: boolean): Promise<void> {
     target.stats.speed += flat ? amount : target.stats.speed * (amount / 100);
   }
 
-  async decreaseSpeed(target: Player, amount: number, flat: boolean) {
+  async decreaseSpeed(target: Player, amount: number, flat: boolean): Promise<void> {
     target.stats.speed -= flat ? amount : target.stats.speed * (amount / 100);
   }
 
-  async increaseDefense(target: Player, amount: number, flat: boolean) {
-    target.stats.defense += flat
-      ? amount
-      : target.stats.defense * (amount / 100);
+  async increaseDefense(target: Player, amount: number, flat: boolean): Promise<void> {
+    target.stats.defense += flat ? amount : target.stats.defense * (amount / 100);
   }
 
-  async decreaseDefense(target: Player, amount: number, flat: boolean) {
-    target.stats.defense -= flat
-      ? amount
-      : target.stats.defense * (amount / 100);
+  async decreaseDefense(target: Player, amount: number, flat: boolean): Promise<void> {
+    target.stats.defense -= flat ? amount : target.stats.defense * (amount / 100);
   }
+
   // Placeholder functions for debuff effects
-  async immunity(target: Player, turns: number) {}
-  async stun(target: Player, turns: number) {}
-  async invincibility(target: Player, turns: number) {}
-  async freeze(target: Player, turns: number) {}
-  async invisibility(target: Player, turns: number) {}
-  async blockBuffs(target: Player, turns: number) {}
-  async cleanse(target: Player) {}
+  async immunity(target: Player, turns: number): Promise<void> {}
+  async stun(target: Player, turns: number): Promise<void> {}
+  async invincibility(target: Player, turns: number): Promise<void> {}
+  async freeze(target: Player, turns: number): Promise<void> {}
+  async invisibility(target: Player, turns: number): Promise<void> {}
+  async blockBuffs(target: Player, turns: number): Promise<void> {}
+  async cleanse(target: Player): Promise<void> {}
 
-  async aoeDamage(user: Player, targets: Player[], thang: any) {
+  async aoeDamage(user: Player, targets: Player[], thang: any): Promise<{ damageArray: number[]; enemyNameArray: string[] }> {
     let damageArray: number[] = [];
     let enemyNameArray: string[] = [];
 
     await Promise.all(
       targets.map(async (target) => {
-        const damage = await that2.critOrNotHandler(
+        // Use the refactored battle system's combat resolver
+        const damage = await this.battle.combatResolver.critOrNotHandler(
           user.stats.critRate,
           user.stats.critDamage,
           user.stats.attack,
           target.stats.defense,
           target,
-          thang.power,
+          thang.power || 150,
           thang.name
         );
         damageArray.push(damage / targets.length);
@@ -192,10 +196,9 @@ class BuffDebuffLogic {
       turnLimit: number;
       name: string;
     }
-  ) {
+  ): Promise<void> {
     const debuffTypes = debuffDetails.type.split("_and_");
     let targetNames: string[] = [];
-    let statChanges: string[] = [];
 
     for (const unit of Array.isArray(target) ? target : [target]) {
       for (const debuffType of debuffTypes) {
@@ -229,13 +232,12 @@ class BuffDebuffLogic {
       }
       targetNames.push(unit.name);
     }
-    const logMessage = `${targetNames.join(", ")} received ${
-      debuffDetails.name
-    } debuff.`;
-    this.battleLogs.push(logMessage);
+    
+    const logMessage = `${targetNames.join(", ")} received ${debuffDetails.name} debuff.`;
+    this.battle.addBattleLog(logMessage);
   }
 
-  async increaseWhat(target: Player | Player[], buffDetails: BuffDetails) {
+  async increaseWhat(target: Player | Player[], buffDetails: BuffDetails): Promise<void> {
     const buffs = buffDetails.type.split("_and_");
     let derArray: string[] = [];
     let statChanges: string[] = [];
@@ -248,9 +250,7 @@ class BuffDebuffLogic {
           case "increase_attack":
             await this.increaseAttack(
               unit,
-              buffDetails.value_amount.attack
-                ? buffDetails.value_amount.attack
-                : 0,
+              buffDetails.value_amount.attack || 0,
               flat
             );
             statChanges.push(
@@ -260,9 +260,7 @@ class BuffDebuffLogic {
           case "increase_speed":
             await this.increaseSpeed(
               unit,
-              buffDetails.value_amount.speed
-                ? buffDetails.value_amount.speed
-                : 0,
+              buffDetails.value_amount.speed || 0,
               flat
             );
             statChanges.push(
@@ -272,9 +270,7 @@ class BuffDebuffLogic {
           case "increase_defense":
             await this.increaseDefense(
               unit,
-              buffDetails.value_amount.defense
-                ? buffDetails.value_amount.defense
-                : 0,
+              buffDetails.value_amount.defense || 0,
               flat
             );
             statChanges.push(
@@ -284,27 +280,21 @@ class BuffDebuffLogic {
           case "decrease_attack":
             await this.decreaseAttack(
               unit,
-              buffDetails.value_amount.attack
-                ? buffDetails.value_amount.attack
-                : 0,
+              buffDetails.value_amount.attack || 0,
               flat
             );
             break;
           case "decrease_speed":
             await this.decreaseSpeed(
               unit,
-              buffDetails.value_amount.speed
-                ? buffDetails.value_amount.speed
-                : 0,
+              buffDetails.value_amount.speed || 0,
               flat
             );
             break;
           case "decrease_defense":
             await this.decreaseDefense(
               unit,
-              buffDetails.value_amount.defense
-                ? buffDetails.value_amount.defense
-                : 0,
+              buffDetails.value_amount.defense || 0,
               flat
             );
             break;
@@ -315,16 +305,14 @@ class BuffDebuffLogic {
       derArray.push(unit.name);
     }
 
-    const logMessage = `${derArray.join(", ")} received ${
-      buffDetails.name
-    } buff, increasing ${statChanges.join(" and ")}.`;
-    this.battleLogs.push(logMessage);
+    const logMessage = `${derArray.join(", ")} received ${buffDetails.name} buff, increasing ${statChanges.join(" and ")}.`;
+    this.battle.addBattleLog(logMessage);
   }
 
   async decreaseWhat(
     target: ExtendedPlayer | ExtendedPlayer[],
     debuffDetails: DebuffDetails
-  ) {
+  ): Promise<void> {
     const debuffs = debuffDetails.type.split("_and_");
     let derArray: string[] = [];
     let statChanges: string[] = [];
@@ -337,9 +325,7 @@ class BuffDebuffLogic {
           case "decrease_attack":
             await this.decreaseAttack(
               unit,
-              debuffDetails.value_amount.attack
-                ? debuffDetails.value_amount.attack
-                : 0,
+              debuffDetails.value_amount.attack || 0,
               flat
             );
             statChanges.push(
@@ -349,9 +335,7 @@ class BuffDebuffLogic {
           case "decrease_speed":
             await this.decreaseSpeed(
               unit,
-              debuffDetails.value_amount.speed
-                ? debuffDetails.value_amount.speed
-                : 0,
+              debuffDetails.value_amount.speed || 0,
               flat
             );
             statChanges.push(
@@ -361,15 +345,11 @@ class BuffDebuffLogic {
           case "decrease_defense":
             await this.decreaseDefense(
               unit,
-              debuffDetails.value_amount.defense
-                ? debuffDetails.value_amount.defense
-                : 0,
+              debuffDetails.value_amount.defense || 0,
               flat
             );
             statChanges.push(
-              `defense by ${debuffDetails.value_amount.defense}${
-                flat ? "" : "%"
-              }`
+              `defense by ${debuffDetails.value_amount.defense}${flat ? "" : "%"}`
             );
             break;
           default:
@@ -379,16 +359,14 @@ class BuffDebuffLogic {
       derArray.push(unit.name);
     }
 
-    const logMessage = `${derArray.join(", ")} received ${
-      debuffDetails.name
-    } debuff, decreasing ${statChanges.join(" and ")}.`;
-    this.battleLogs.push(logMessage);
+    const logMessage = `${derArray.join(", ")} received ${debuffDetails.name} debuff, decreasing ${statChanges.join(" and ")}.`;
+    this.battle.addBattleLog(logMessage);
   }
 
   async increaseAttackNSpeed(
     target: ExtendedPlayer | ExtendedPlayer[],
     buffDetails: BuffDetails
-  ) {
+  ): Promise<void> {
     const targetArray = Array.isArray(buffDetails.targets)
       ? buffDetails.targets
       : [buffDetails.targets];
@@ -408,19 +386,17 @@ class BuffDebuffLogic {
         };
 
         if (buff.flat) {
-          unit.stats.attack += buff.attack_amount;
-          unit.stats.speed += buff.speed_amount;
+          unit.stats.attack += buff.attack_amount || 0;
+          unit.stats.speed += buff.speed_amount || 0;
         } else {
-          unit.stats.attack += unit.stats.attack * (buff.attack_amount / 100);
-          unit.stats.speed += unit.stats.speed * (buff.speed_amount / 100);
+          unit.stats.attack += unit.stats.attack * ((buff.attack_amount || 0) / 100);
+          unit.stats.speed += unit.stats.speed * ((buff.speed_amount || 0) / 100);
         }
         derArray.push(unit.name);
       }
 
-      this.battleLogs.push(
-        ` ${derArray.join(", ")} received ${
-          buffDetails.name
-        } buff, increasing attack by ${buff.attack_amount}${
+      this.battle.addBattleLog(
+        ` ${derArray.join(", ")} received ${buffDetails.name} buff, increasing attack by ${buff.attack_amount}${
           buff.flat ? "" : "%"
         } and speed by ${buff.speed_amount}${buff.flat ? "" : "%"}.`
       );
@@ -435,25 +411,17 @@ class BuffDebuffLogic {
       };
 
       if (buff.flat) {
-        (target as Player).stats.attack += buff.attack_amount
-          ? buff.attack_amount
-          : 0;
-        (target as Player).stats.speed += buff.speed_amount
-          ? buff.speed_amount
-          : 0;
+        (target as Player).stats.attack += buff.attack_amount || 0;
+        (target as Player).stats.speed += buff.speed_amount || 0;
       } else {
         (target as Player).stats.attack +=
-          (target as Player).stats.attack *
-          (buff.attack_amount ? buff.attack_amount / 100 : 0 / 100);
+          (target as Player).stats.attack * ((buff.attack_amount || 0) / 100);
         (target as Player).stats.speed +=
-          (target as Player).stats.speed *
-          (buff.speed_amount ? buff.speed_amount / 100 : 0 / 100);
+          (target as Player).stats.speed * ((buff.speed_amount || 0) / 100);
       }
 
-      this.battleLogs.push(
-        `${(target as Player).name} received ${
-          buffDetails.name
-        } buff, increasing attack by ${buff.attack_amount}${
+      this.battle.addBattleLog(
+        `${(target as Player).name} received ${buffDetails.name} buff, increasing attack by ${buff.attack_amount}${
           buff.flat ? "" : "%"
         } and speed by ${buff.speed_amount}${buff.flat ? "" : "%"}.`
       );

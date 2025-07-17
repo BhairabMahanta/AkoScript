@@ -6,7 +6,7 @@ import {
 import { Scenario } from "../../../data/information/scenarios";
 import { allEnemies } from "../monsterInfo/allEnemies";
 import { bosses } from "../monsterInfo/bosses";
-import { Enemy } from "../../adv/action/battle/battle";
+import { Enemy } from "../../adv/action/battle/types/BattleTypes";
 import { iconMap } from "../../adv/action/battle/sendEmbed";
 export const generateEmbed = (
   scenario: Scenario,
@@ -42,7 +42,7 @@ ${scenario.floors
           `${enemy.name} ${
             enemy.hasAllies.length > 0
               ? `(Allies: ${enemy.hasAllies
-                  .map((ally) => ally.name)
+                  .map((ally:any) => ally.name)
                   .join(", ")})`
               : ""
           }`
@@ -111,8 +111,8 @@ export const generateFloorDetailsEmbed = (
         const mainAttackPattern = mainMob.attackPattern;
         // Allies stats
         const allies = enemy.hasAllies
-          .filter((allyName) => allyName.name !== "none") // Skip "none" entries
-          .map((allyName) => {
+          .filter((allyName:any) => allyName.name !== "none") // Skip "none" entries
+          .map((allyName:any) => {
             const yanemi: any =
               allEnemies.find((ella) => ella.name === allyName.name) || {};
             const allyElement = allyName.element;
@@ -137,7 +137,7 @@ export const generateFloorDetailsEmbed = (
   🧎‍♂️ **Abilities:** ${mainAbilities.join(", ") || "None"}
   🌊 **Waves:** ${enemy.waves
     .map(
-      (wave) => `\n __Wave ${wave.waveNumber}:__ **${wave.enemies.join(", ")}**`
+      (wave:any) => `\n __Wave ${wave.waveNumber}:__ **${wave.enemies.join(", ")}**`
     )
     .join(" ")}
   👥 **Allies:** ${allies.length ? allies.join("\n") : "None"}

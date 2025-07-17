@@ -86,7 +86,7 @@ const allFamiliars: AllFamiliars = {
       stats: {
         attack: 65,
         defense: 70,
-        speed: 99,
+        speed: 101,
         hp: 90,
       },
       experience: {

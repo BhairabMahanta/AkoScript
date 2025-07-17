@@ -15,7 +15,7 @@ import allFamiliars from "../../../../data/information/allfamiliars";
 import path from "path";
 import { DeactivatedElement } from "../../../../data/mongo/elementSchema";
 
-import { ExtendedPlayer } from "../../../gamelogic/buffDebuffManager";
+import { ExtendedPlayer } from "../../../gamelogic/buffdebufflogic";
 
 interface Element {
   name: string;

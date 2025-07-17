@@ -1,4 +1,4 @@
-import { Enemy } from "../../commands/adv/action/battle/battle";
+import { Enemy } from "../../commands/adv/action/battle/types/BattleTypes";
 
 export interface Floor {
   floorNumber: number;

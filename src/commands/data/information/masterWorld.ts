@@ -20,13 +20,15 @@ import {
   generateEmbed,
   generateFloorDetailsEmbed,
 } from "./mapFunctions";
-import Battle, { ExtendedEnemy } from "../../adv/action/battle/battle";
-import { Enemy } from "../../adv/action/battle/battle";
+
+
 import {
   PlayerScenarioData,
   interfaceScenario,
 } from "../../../data/mongo/scenarioInterface";
 import { handleAdventure } from "../../adv/action/movement/advClass";
+import { ExtendedEnemy, Enemy } from '../../adv/action/battle/types/BattleTypes';
+import Battle from "../../adv/action/battle/battle";
 
 const db = mongoClient.db("Akaimnky");
 const scenarioCollection: any = db.collection("scenarioData");
