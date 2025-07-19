@@ -31,8 +31,8 @@ type Quest = {
 export type ActiveQuest = {
   objectives: Objective[];
   timeLimit: {
-    totalDays: String;
-    daysLeft: String;
+    totalDays: string;
+    daysLeft: string;
   };
   questChannel: string;
   questStatus: string;

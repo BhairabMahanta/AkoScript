@@ -1,796 +1,625 @@
 import {
   ActionRowBuilder,
-  ButtonBuilder,
   StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
   EmbedBuilder,
   Message,
   Interaction,
-  TextChannel,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle,
 } from "discord.js";
-import mongoose from "mongoose";
-import { DeckItem, playerModel } from "../../../data/mongo/playerschema";
-import { mongoClient } from "../../../data/mongo/mongo";
-const db = mongoClient.db("Akaimnky");
-const collection: any = db.collection("akaillection");
-import classesData from "../../../data/classes/allclasses";
-import racesData from "../../../data/races/races";
-import abilitiesData from "../../../data/abilities";
+import { PlayerModal } from "../../../data/mongo/playerschema";
 import { Command } from "../../../@types/command";
-
-let selectMenu: StringSelectMenuBuilder;
-let raceOptions: Array<{ label: string; value: string }>;
-let classOptions: Array<{ label: string; value: string }>;
-let classRow: any;
-let raceRow: any;
-let familiars: any; // Replace with proper type if known
-let playerData: any = null; // Replace with proper type
-let selectedRaceValue: string;
-let selectedClassValue: string;
-
-const selectButton = new ButtonBuilder() // Add a new button for selecting
-  .setCustomId("select_race_button")
-  .setLabel("Select")
-  .setStyle(1);
-
-const selectRow = new ActionRowBuilder().addComponents(
-  selectButton // Add the new "Select" button
-);
-
-const selectButton2 = new ButtonBuilder() // Add a new button for selecting
-  .setCustomId("select_class_button")
-  .setLabel("Select")
-  .setStyle(1);
-
-const selectRow2 = new ActionRowBuilder().addComponents(
-  selectButton2 // Add the new "Select" button
-);
 import { ExtendedClient } from "../../../index";
+import { SelectionManager } from "./selectionUtils";
+import { DeckManager, createSlotModal, createFastInputModal } from "./deckUtils";
 
-import { handleRaceSelection2, handleSelectRace } from "./raceClick";
-import { handleSelectClass } from "./classClick";
+interface SelectAllState {
+  currentView: 'main' | 'race' | 'class' | 'deck';
+  selectionManager: SelectionManager;
+  deckManager?: DeckManager;
+  messageCollector?: any;
+}
+
 const selectAllCommand: Command = {
   name: "selectAll",
-  description: "Select your race, class, and up to 3 familiars!",
-  aliases: ["sa", "selectall"],
+  description: "Select your race, class, and configure your battle decks!",
+  aliases: ["sa", "selectall", "config", "configure"],
   async execute(
     client: ExtendedClient,
     message: Message<boolean>,
     args: string[]
   ): Promise<void> {
-    const { db } = client;
-    const filter = { _id: message.author.id };
-    playerData = await collection.findOne(filter);
-    // CLASS
-    classOptions = Object.keys(classesData)
-      .filter((className) => classesData[className].state !== "locked")
-      .map((className) => ({
-        label: className,
-        value: `class-${className}`,
-      }));
-
-    const classSelectMenu = new StringSelectMenuBuilder()
-      .setCustomId("class_select")
-      .setPlaceholder("Select your class")
-      .addOptions(classOptions);
-    classRow = new ActionRowBuilder().addComponents(classSelectMenu);
-    // RACE
-    raceOptions = Object.keys(racesData).map((raceName) => ({
-      label: raceName,
-      value: `race-${raceName}`,
-    }));
-    const raceSelectMenu = new StringSelectMenuBuilder()
-      .setCustomId("race_select")
-      .setPlaceholder("Select your race")
-      .addOptions(raceOptions);
-    raceRow = new ActionRowBuilder().addComponents(raceSelectMenu);
-
-    // Initial Select Menu for selecting between Race, Class, and Familiar
-    const initialSelectMenu = new StringSelectMenuBuilder()
-      .setCustomId("initial_select")
-      .setPlaceholder("Select an option")
-      .addOptions([
-        { label: "Select Race", value: "select_race" },
-        { label: "Select Class", value: "select_class" },
-        { label: "Select Familiar", value: "select_familiar" },
-        { label: "Set Deck", value: "select_deck" },
-      ]);
-
-    const initialRow = new ActionRowBuilder().addComponents(initialSelectMenu);
-
-    const initialEmbed = new EmbedBuilder()
-      .setTitle("Select Your Race, Class, and Familiars")
-      .setDescription("Choose an option to start:");
-
-    let sentMessage = await (message.channel as any).send({
-      embeds: [initialEmbed],
-      components: [initialRow],
-    });
-
-    // DECK
-
-    let deckEmbedMessage: any;
-    const empty: DeckItem = {
-      name: "empty",
-      serialId: "",
-      globalId: "69420haha",
-      stats: {
-        attack: 0,
-
-        magic: 0,
-
-        defense: 0,
-        magicDefense: 0,
-        speed: 0,
-        hp: 0,
-
-        critRate: 0,
-        critDamage: 0,
-
-        luck: 0,
-        divinePower: 0,
-        potential: 0,
-      },
-    };
-    const deckButtons = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("slot1").setLabel("1").setStyle(3),
-      new ButtonBuilder().setCustomId("slot2").setLabel("2").setStyle(3),
-      new ButtonBuilder().setCustomId("slot3").setLabel("3").setStyle(3),
-      new ButtonBuilder().setCustomId("slot4").setLabel("4").setStyle(3),
-      new ButtonBuilder().setCustomId("save").setLabel("Save").setStyle(1)
-    );
-
-    const deckOptionSelectRow =
-      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId("fast_select")
-          .setPlaceholder("Select fast options")
-          .addOptions([
-            {
-              label: "Select Deck Fast",
-              description:
-                "Input 4 responses, with 'e' for empty, 'p' for player and numbers as serial IDs.",
-              value: "select_deck_fast",
-            },
-            {
-              label: "Auto Select",
-              description: "Randomly select familiar IDs for the deck",
-              value: "auto_select",
-            },
-            {
-              label: "Go Back",
-              description: "Go back to the main menu",
-              value: "go_back",
-            },
-          ])
-      );
-    const formattedDescription = playerData.deck.map((item: any) => {
-      const name = item?.name != "empty" ? `(${item.name})` : "__empty__";
-      const serialId = item?.serialId || "e";
-      return `${name} \`${serialId}\``;
-    });
-
-    const embedDeck = new EmbedBuilder()
-      .setTitle("Deck Configuration")
-      .setDescription(`**__DECK__**: ${formattedDescription.join("   |   ")}`)
-      .setColor(0x00ae86);
-
-    // INTERACTION
-
-    const filterInteraction = (i: any) =>
-      [
-        "initial_select",
-        "race_select",
-        "select_race_button",
-        "select_class_button",
-        "select_race",
-        "select_class",
-        "class_select",
-        "familiar_select",
-        "select_deck",
-        "fast_select",
-        "slot1",
-        "slot2",
-        "slot3",
-        "slot4",
-        "select_deck_fast",
-        "auto_select",
-        "save",
-        "go_back",
-      ].includes(i.customId) && i.user.id === message.author.id;
-
-    let collector = sentMessage.createMessageComponentCollector({
-      filter: filterInteraction,
-      time: 300000,
-    });
-    let collector2: any;
-
-    collector.on("collect", async (i: any) => {
-      try {
-        await i.deferUpdate();
-
-        console.log("Interaction custom ID:", i.customId);
-        let updateEmbed: EmbedBuilder;
-
-        if (i.customId === "initial_select") {
-          const selectedOption = i.values[0];
-          if (selectedOption === "select_race") {
-            await handleSelectRace(i, sentMessage, raceOptions, raceRow);
-          } else if (selectedOption === "select_class") {
-            await handleSelectClass(i, sentMessage, classRow);
-          } else if (selectedOption === "select_familiar") {
-            await handleSelectFamiliar(i, sentMessage);
-          } else if (selectedOption === "select_deck") {
-            console.log("select_deck");
-            sentMessage.edit({
-              embeds: [initialEmbed],
-              components: [],
-            });
-            deckEmbedMessage = await (message.channel as any).send({
-              embeds: [embedDeck],
-              components: [deckButtons, deckOptionSelectRow],
-            });
-            collector2 = deckEmbedMessage.createMessageComponentCollector({
-              filter: filterInteraction,
-              time: 300000,
-            });
-            collector2?.on("collect", async (i: any) => {
-              if (i.isButton()) {
-                const slotNumber = i.customId.replace("slot", "");
-
-                if (i.customId === "save") {
-                  await i.deferUpdate();
-                  await collection.updateOne(filter, {
-                    $set: { deck: playerData.deck },
-                  });
-                  await (message.channel as any).send(
-                    "Deck configuration saved!"
-                  );
-                  collector.stop();
-                } else if (i.customId === "reset") {
-                  playerData.deck = Array(4).fill(empty);
-                  await collection.updateOne(filter, {
-                    $set: { deck: playerData.deck },
-                  });
-
-                  const resetDescription = playerData.deck
-                    .map(
-                      (item: any, index: any) =>
-                        `${index + 1}) ${item ? item.name : "empty"}`
-                    )
-                    .join("\n");
-                  embedDeck.setDescription(resetDescription);
-
-                  await deckEmbedMessage.edit({
-                    embeds: [embedDeck],
-                    content: "Deck reset successfully!",
-                    components: [deckButtons, deckOptionSelectRow],
-                  });
-                } else {
-                  const modal = new ModalBuilder()
-                    .setCustomId(`modal-${slotNumber}`)
-                    .setTitle(`Configure Slot ${slotNumber}`)
-                    .addComponents(
-                      new ActionRowBuilder<TextInputBuilder>().addComponents(
-                        new TextInputBuilder()
-                          .setCustomId(`input-${slotNumber}`)
-                          .setLabel("Enter the familiar ID or type 'player'")
-                          .setStyle(TextInputStyle.Short)
-                      )
-                    );
-
-                  await i.showModal(modal);
-                }
-              } else if (i.isStringSelectMenu()) {
-                console.log("what");
-                console.log("customId", i.customId);
-                if (i.customId === "fast_select") {
-                  const selectedValue = i.values[0];
-                  console.log("selectedvalue", selectedValue);
-                  if (selectedValue === "select_deck_fast") {
-                    const modal = new ModalBuilder()
-                      .setCustomId("modal-fast_select")
-                      .setTitle("Fast Deck Selection")
-                      .addComponents(
-                        new ActionRowBuilder<TextInputBuilder>().addComponents(
-                          new TextInputBuilder()
-                            .setCustomId("input-fast_select")
-                            .setLabel(
-                              "Enter 4 values (e for empty, numbers for IDs)"
-                            )
-                            .setStyle(TextInputStyle.Paragraph)
-                        )
-                      );
-                    await i.showModal(modal);
-                  } else if (selectedValue === "auto_select") {
-                    i.deferUpdate();
-                    const extraPlayerDataNonUpdating = await collection.findOne(
-                      filter
-                    );
-
-                    if (!extraPlayerDataNonUpdating) return;
-
-                    // Ensure playerData.deck is reset
-                    playerData.deck = [];
-
-                    // Always include the player
-                    const playerSlot = {
-                      serialId: "player",
-                      globalId: i.user.id,
-                      name: playerData.name,
-                      stats: extraPlayerDataNonUpdating.stats,
-                    };
-                    playerData.deck.push(playerSlot);
-
-                    // Shuffle and pick up to 4 familiars
-                    const shuffledFamiliars =
-                      extraPlayerDataNonUpdating.collectionInv.sort(
-                        () => Math.random() - 0.5
-                      );
-
-                    const selectedFamiliars = shuffledFamiliars.slice(
-                      0,
-                      Math.min(3, shuffledFamiliars.length)
-                    );
-                    playerData.deck.push(...selectedFamiliars);
-
-                    // Fill remaining slots with empty
-                    while (playerData.deck.length < 4) {
-                      playerData.deck.push(empty);
-                    }
-
-                    // Update the database
-                    await collection.updateOne(filter, {
-                      $set: { deck: playerData.deck },
-                    });
-
-                    // Create the updated description using the new padding system
-                    const formattedDescription = playerData.deck.map(
-                      (item: any) => {
-                        const name =
-                          item?.name != "empty"
-                            ? `(${item.name})`
-                            : "__empty__";
-                        const serialId = item?.serialId || "e";
-                        return `${name} \`${serialId}\``;
-                      }
-                    );
-
-                    embedDeck.setDescription(
-                      `**__DECK__**:${formattedDescription.join("   |   ")}`
-                    );
-
-                    await deckEmbedMessage.edit({
-                      content: "Deck auto-selected successfully!",
-                      embeds: [embedDeck],
-                      components: [deckButtons, deckOptionSelectRow],
-                    });
-                  } else if (selectedValue === "go_back") {
-                    deckEmbedMessage.delete();
-                    sentMessage.edit({
-                      embeds: [initialEmbed],
-                      components: [initialRow],
-                    });
-                  }
-                }
-              }
-            });
-          }
-        } else if (i.customId.startsWith("race_select")) {
-          selectedRaceValue = i.values[0];
-          await handleRaceSelection2(
-            i,
-            racesData,
-            abilitiesData,
-            sentMessage,
-            selectRow,
-            raceRow,
-            initialRow
-          );
-        } else if (i.customId === "select_race_button") {
-          if (selectedRaceValue.startsWith("race-")) {
-            const raceName = selectedRaceValue.replace("race-", "");
-            playerData.race = raceName;
-            await updateRace("race-updated", raceName);
-            await (message.channel as any).send(
-              `You've selected the race: ${raceName}`
-            );
-            sentMessage.edit({ components: [initialRow] });
-          }
-        } else if (i.customId.startsWith("class_select")) {
-          selectedClassValue = i.values[0];
-          console.log("Selected class value:", selectedClassValue);
-          if (selectedClassValue.startsWith("class-")) {
-            const className = selectedClassValue.replace("class-", "");
-            console.log("Class name:", className);
-            updateEmbed = new EmbedBuilder()
-              .setTitle(`Pick ${className} Class?`)
-              .setDescription(
-                "Use the buttons to navigate through the options."
-              );
-            await sentMessage.edit({
-              embeds: [updateEmbed],
-              components: [selectRow2, classRow, initialRow],
-            });
-          }
-        } else if (i.customId === "select_class_button") {
-          if (selectedClassValue.startsWith("class-")) {
-            const className = selectedClassValue.replace("class-", "");
-            playerData.class = className;
-            await updateClass("class-updated", className);
-            await (message.channel as any).send(
-              `You've selected the class: ${className}`
-            );
-            sentMessage.edit({ components: [initialRow] });
-          }
-        }
-      } catch (error) {
-        console.error("An error occurred:", error);
-        (message.channel as any).send(
-          "An error occurred while processing your selection."
-        );
-      }
-    });
-
-    async function handleSelectFamiliar(
-      interaction: Interaction,
-      sentMessage: Message
-    ): Promise<void> {
-      let messageja;
-      const familiars = playerData.cards.name;
-
-      if (familiars.length === 0) {
-        console.log("You have no familiars to select.");
-        (message.channel as any).send("You have no familiars to select.");
+    try {
+      // Check if player exists
+      const playerData = await PlayerModal.findById(message.author.id);
+      if (!playerData) {
+        await message.reply("❌ You don't have a player account. Use `!register` to create one.");
         return;
       }
-      const options = familiars.map((familiar: any) => {
-        if (familiar) {
-          return {
-            label: familiar,
-            value: familiar,
-          };
-        }
-      });
 
-      let selectMenu;
-      if (familiars.length < 2) {
-        selectMenu = new StringSelectMenuBuilder()
-          .setCustomId("select_familiars")
-          .setMinValues(1)
-          .setPlaceholder("Select up to 3 familiars")
-          .addOptions(options);
-      } else if (familiars.length < 3 && familiars.length > 1) {
-        selectMenu = new StringSelectMenuBuilder()
-          .setCustomId("select_familiars")
-          .setMinValues(1)
-          .setMaxValues(2)
-          .setPlaceholder("Select up to 3 familiars")
-          .addOptions(options);
-      } else {
-        selectMenu = new StringSelectMenuBuilder()
-          .setCustomId("select_familiars")
-          .setMinValues(1)
-          .setMaxValues(3)
-          .setPlaceholder("Select up to 3 familiars")
-          .addOptions(options);
-      }
-
-      const row = new ActionRowBuilder().addComponents(selectMenu);
-
-      const switchSelectMenu = new StringSelectMenuBuilder()
-        .setCustomId("initial_select")
-        .setPlaceholder("Switch to another selection")
-        .addOptions([
-          { label: "Select Race", value: "select_race" },
-          { label: "Select Class", value: "select_class" },
-        ]);
-
-      const switchRow: any = new ActionRowBuilder().addComponents(
-        switchSelectMenu
-      );
-
-      let embed = new EmbedBuilder()
-        .setTitle("Select up to 3 familiars:")
-        .setDescription("Select up to 3 familiars to help you on your journey.")
-        .setColor("#00FFFF");
-
-      await sentMessage.edit({
-        components: [switchRow],
-      });
-      messageja = await (message.channel as any).send({
-        embeds: [embed],
-        components: [row],
-      });
-
-      const filterr = (interaction: any) => {
-        return (
-          interaction.customId === "select_familiars" &&
-          interaction.user.id === message.author.id
-        );
+      const state: SelectAllState = {
+        currentView: 'main',
+        selectionManager: new SelectionManager(message.author.id)
       };
 
-      const collector = messageja.createMessageComponentCollector({
-        filter: filterr,
-        time: 60000,
-      });
+      // Helper function to get familiar names safely from deck
+      const getFamiliarNamesFromDeck = (deck: any[] | undefined) => {
+        if (!deck || !Array.isArray(deck)) return [];
+        
+        return deck
+          .filter(item => item && item.name && item.name !== "empty" && item.serialId !== "player")
+          .map(item => item.name)
+          .slice(0, 3); // Limit to 3 for display
+      };
 
-      collector.on("collect", async (interaction: any) => {
-        try {
-          let selectedFamiliars: string[] = [];
-          const selectedValues = interaction.values;
-          selectedFamiliars = selectedValues;
-
-          selectMenu.setOptions(
-            familiars.map((familiar: any) => {
-              const isSelected = selectedValues.includes(familiar);
-              return { label: familiar, value: familiar, default: false };
-            })
-          );
-          console.log("selectedFamiliars:", selectedFamiliars);
-          const selectedFamiliarsArray: string[][] = [];
-          selectedFamiliarsArray.push(selectedFamiliars);
-          console.log("sfArray:", selectedFamiliarsArray);
-
-          (message.channel as any).send(
-            `You have selected: ${selectedFamiliars.join(
-              ", "
-            )} as your familiars!`
-          );
-          await updateFamiliar("adyuga", selectedFamiliarsArray);
-
-          interaction.update({
-            embeds: [embed],
-            components: [new ActionRowBuilder().addComponents(selectMenu)],
-          });
-          setTimeout(() => {
-            messageja.delete();
-          }, 5000);
-        } catch (err) {
-          console.error("Error updating player data:", err);
+      // Create main menu
+      const createMainMenu = async () => {
+        // Refresh player data to get latest info
+        const currentPlayerData = await PlayerModal.findById(message.author.id);
+        if (!currentPlayerData) {
+          throw new Error("Player data not found");
         }
-      });
+        
+        // Helper function to count deck slots safely
+        const countDeckSlots = (deck: any[] | undefined) => {
+          if (!deck || !Array.isArray(deck)) return 0;
+          return deck.filter(item => item && item.name && item.name !== 'empty').length;
+        };
 
-      collector.on("end", () => {
-        // Update the player's data with the selected familiars
-      });
-    }
+        // Get current familiar names from battle deck
+        const battleDeckFamiliars = getFamiliarNamesFromDeck(currentPlayerData.deck);
+        const familiarText = battleDeckFamiliars.length > 0 
+          ? battleDeckFamiliars.join(', ') 
+          : 'None selected';
 
-    async function updateFamiliar(
-      playerIdee: string,
-      className: string[][]
-    ): Promise<void> {
-      const selektFam = className;
-      console.log("selectfam:", selektFam);
-
-      try {
-        if (!playerData.selectedFamiliars) {
-          playerData.selectedFamiliars = { name: selektFam.flat() };
-        } else if (playerData.selectedFamiliars.name) {
-          playerData.selectedFamiliars.name = selektFam.flat();
-        }
-        if (playerData) {
-          console.log("playerData:", playerData);
-          const updates = {
-            $set: { selectedFamiliars: playerData.selectedFamiliars },
-          };
-          console.log("rewards.xpereince:", playerData.selectedFamiliars);
-          await collection.updateOne(filter, updates);
-        }
-      } catch (error) {
-        console.error("An error occurred:", error);
-        (message.channel as any).send(
-          "An error occurred while processing your selection."
-        );
-      }
-    }
-
-    //interactionCreate!
-
-    client.on("interactionCreate", async (interaction: any) => {
-      if (!interaction.isModalSubmit()) return;
-
-      const inputValues: string = interaction.fields.getTextInputValue(
-        `input-${interaction.customId.split("-")[1]}`
-      );
-
-      if (interaction.customId === "modal-fast_select") {
-        const inputs = inputValues.split(" ");
-        playerData.deck = [];
-        for (let i = 0; i < 4; i++) {
-          const input = inputs[i];
-          if (input.toLowerCase() === "e") {
-            playerData.deck.push(empty);
-          } else {
-            const extraPlayerDataNonUpdating = await collection.findOne(filter);
-            if (!extraPlayerDataNonUpdating) continue;
-
-            const foundItem = extraPlayerDataNonUpdating.collectionInv.find(
-              (item: { serialId: string }) => item.serialId === input
-            );
-
-            if (foundItem) {
-              const existingFamiliar = playerData.deck.find(
-                (item: { name?: string }) =>
-                  item && item.name === foundItem.name
-              );
-
-              if (existingFamiliar) {
-                await interaction.reply({
-                  content: `You can't add two of the same familiars (${foundItem.name}) to your deck.`,
-                  ephemeral: true,
-                });
-                return;
-              }
-
-              const filledSlotsCount = playerData.deck.filter(
-                (item: { name?: string }) => item && item.name !== "empty"
-              ).length;
-
-              if (filledSlotsCount >= 3) {
-                await interaction.reply({
-                  content: `You can only have 3 familiars in your deck. Please ensure the remaining is the player.`,
-                  ephemeral: true,
-                });
-                return;
-              }
-            }
-            playerData.deck.push(foundItem || empty);
-          }
-        }
-      } else {
-        const slotNumber = parseInt(
-          interaction.customId.replace("modal-", ""),
-          10
-        );
-        const input = interaction.fields.getTextInputValue(
-          `input-${slotNumber}`
-        );
-        console.log("ithinknormalbuttons");
-        let updateText: any = input;
-
-        const extraPlayerDataNonUpdating = await collection.findOne(filter);
-        if (!extraPlayerDataNonUpdating) return;
-
-        if (input.toLowerCase() === "p" || input.toLowerCase() === "player") {
-          updateText = {
-            serialId: "player",
-            globalId: interaction.user.id,
-            name: interaction.user.username,
-            stats: {},
-          };
-        } else if (
-          input.toLowerCase() === "e" ||
-          input.toLowerCase() === "empty"
-        ) {
-          updateText = empty;
-        } else {
-          const foundItem = extraPlayerDataNonUpdating.collectionInv.find(
-            (item: { serialId: string }) => item.serialId === input
-          );
-          console.log("foundItem", foundItem);
-          let theElement: any;
-          if (foundItem) {
-            const existingFamiliar = playerData.deck.find(
-              (item: { name?: string }) => item && item.name === foundItem.name
-            );
-
-            if (existingFamiliar) {
-              await interaction.reply({
-                content: `You can't add two of the same familiars (${foundItem.name}) to your deck.`,
-                ephemeral: true,
-              });
-              return;
-            }
-
-            const filledSlotsCount = playerData.deck.filter(
-              (item: { name?: string }) => item && item.name !== "empty"
-            ).length;
-
-            if (filledSlotsCount >= 3) {
-              await interaction.reply({
-                content: `You can only have 3 familiars in your deck. Please ensure the remaining is the player.`,
-                ephemeral: true,
-              });
-              return;
-            }
-            theElement = foundItem;
-          } else {
-            await interaction.reply({
-              content: `The familiar ID (${input}) doesn't exist.`,
-              ephemeral: true,
-            });
-            return;
-          }
-
-          updateText = {
-            serialId: input,
-            globalId: `${theElement.globalId}`,
-            name: theElement.name,
-            element: theElement.element,
-            stats: theElement.stats,
-            move: theElement.move,
-            ability: theElement.ability,
-          };
-        }
-
-        playerData.deck = playerData.deck || [];
-        playerData.deck[slotNumber - 1] = updateText;
-      }
-
-      console.log("updating?");
-      const updatedDescription = playerData.deck
-        .map(
-          (item: { name?: string }) =>
-            `${
-              item
-                ? `\`\`${item.name?.toString().padStart(14, " ")}\`\``
-                : `\`\`${empty.toString().padStart(7, " ")}\`\``
-            }`
-        )
-        .join("\n");
-
-      const formattedDescription = playerData.deck.map((item: any) => {
-        const name = item?.name != "empty" ? `(${item.name})` : "__empty__";
-        const serialId = item?.serialId || "e";
-        return `${name} \`${serialId}\``;
-      });
-
-      embedDeck.setDescription(
-        `**__DECK__**: ${formattedDescription.join("   |   ")}`
-      );
-
-      await collection.updateOne(filter, { $set: { deck: playerData.deck } });
-
-      await interaction.update({
-        embeds: [embedDeck],
-        components: [deckButtons, deckOptionSelectRow],
-      });
-    });
-
-    async function updateRace(status: string, raceName: string) {
-      const raceStats = racesData[raceName]?.stats;
-
-      if (!raceStats) {
-        console.error("Invalid race name:", raceName);
-        return;
-      }
-
-      await collection.updateOne(
-        { _id: message.author.id },
-        {
-          $set: {
-            race: raceName,
-            raceStatus: status,
-            stats: {
-              attack: raceStats.attack,
-              magic: raceStats.magic,
-              defense: raceStats.defense,
-              magicDefense: raceStats.magicDefense,
-              speed: raceStats.speed,
-              hp: raceStats.hp,
-              luck: playerData.stats.luck,
-              divinePower: raceStats.divinePower,
-              potential: playerData.stats.potential,
-              critRate: playerData.stats.critRate,
-              critDamage: playerData.stats.critDamage,
+        const embed = new EmbedBuilder()
+          .setTitle("🎮 Character & Deck Configuration")
+          .setDescription("Configure your character's race, class, and battle decks for different game modes.")
+          .setColor('#7289DA')
+          .addFields([
+            {
+              name: "👤 Character Setup",
+              value: [
+                `**Race:** ${currentPlayerData.race || 'Not Selected'}`,
+                `**Class:** ${currentPlayerData.class || 'Not Selected'}`
+              ].join('\n'),
+              inline: true
             },
-          },
-        }
-      );
-    }
+            {
+              name: "🎴 Deck Status",
+              value: [
+                `**Battle:** ${countDeckSlots(currentPlayerData.deck)}/4 slots`,
+                `**Arena:** ${countDeckSlots(currentPlayerData.arena?.defenseDeck)}/4 slots`,
+                `**Dungeon:** ${countDeckSlots(currentPlayerData.dungeonDeck)}/6 slots`
+              ].join('\n'),
+              inline: true
+            },
+            {
+              name: "🦋 Current Battle Familiars",
+              value: familiarText,
+              inline: false
+            }
+          ])
+          .setFooter({ text: "Select an option below to configure • Session expires in 5 minutes" });
 
-    async function updateClass(status: string, className: string) {
-      await collection.updateOne(
-        { _id: message.author.id },
-        {
-          $set: { class: className, classStatus: status },
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId("main_select")
+          .setPlaceholder("🎯 Choose what to configure")
+          .addOptions([
+            { 
+              label: "🏰 Race Selection", 
+              value: "select_race", 
+              description: "Choose your character's race and base stats",
+              emoji: "🏰"
+            },
+            { 
+              label: "⚔️ Class Selection", 
+              value: "select_class", 
+              description: "Choose your character's class and abilities",
+              emoji: "⚔️"
+            },
+            { 
+              label: "🎴 Battle Deck", 
+              value: "select_battle_deck", 
+              description: "Configure your main 4-slot combat deck",
+              emoji: "🎴"
+            },
+            { 
+              label: "🛡️ Arena Deck", 
+              value: "select_arena_deck", 
+              description: "Configure your 4-slot PvP defense deck",
+              emoji: "🛡️"
+            },
+            { 
+              label: "🏰 Dungeon Deck", 
+              value: "select_dungeon_deck", 
+              description: "Configure your 6-slot dungeon exploration deck",
+              emoji: "🏰"
+            }
+          ]);
+
+        return {
+          embeds: [embed],
+          components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu)]
+        };
+      };
+
+      // Send initial message
+      const sentMessage = await message.reply(await createMainMenu());
+
+      // Create interaction collector
+      const collector = sentMessage.createMessageComponentCollector({
+        filter: (i: Interaction) => i.user.id === message.author.id,
+        time: 300000 // 5 minutes
+      });
+
+      state.messageCollector = collector;
+
+      // Handle interactions
+      collector.on('collect', async (interaction) => {
+        try {
+          if (interaction.isStringSelectMenu()) {
+            await handleSelectMenuInteraction(interaction, state, sentMessage);
+          } else if (interaction.isButton()) {
+            await handleButtonInteraction(interaction, state, sentMessage);
+          }
+        } catch (error) {
+          console.error('Error handling interaction:', error);
+          
+          const errorMessage = '❌ An error occurred while processing your selection. Please try again.';
+          
+          if (interaction.deferred) {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+          } else if (interaction.replied) {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+          } else {
+            try {
+              await interaction.reply({ content: errorMessage, ephemeral: true });
+            } catch (replyError) {
+              console.error('Could not reply to interaction:', replyError);
+            }
+          }
         }
-      );
+      });
+
+      // Handle modal submissions separately using client event
+      const modalHandler = async (interaction: any) => {
+        if (!interaction.isModalSubmit() || interaction.user.id !== message.author.id) return;
+
+        try {
+          if (interaction.customId === 'deck_modal_fast_select') {
+            await handleFastDeckInput(interaction, state, sentMessage);
+          } else if (interaction.customId.startsWith('deck_modal_')) {
+            await handleSlotInput(interaction, state, sentMessage);
+          }
+        } catch (error) {
+          console.error('Error handling modal submission:', error);
+          await interaction.reply({
+            content: '❌ An error occurred while processing your input.',
+            ephemeral: true
+          });
+        }
+      };
+
+      client.on('interactionCreate', modalHandler);
+
+      // Handle collector end
+      collector.on('end', async () => {
+        // Remove modal handler
+        client.off('interactionCreate', modalHandler);
+        
+        try {
+          const timeoutEmbed = new EmbedBuilder()
+            .setTitle("⏰ Configuration Session Expired")
+            .setDescription("Your configuration session has timed out. Use `!selectall` to start a new session.")
+            .setColor('#FFA500');
+
+          await sentMessage.edit({
+            embeds: [timeoutEmbed],
+            components: []
+          });
+        } catch (error) {
+          console.log('Could not update message after collector end');
+        }
+      });
+
+      // All the helper functions remain the same but with proper error handling...
+      // [Rest of the helper functions from the previous version remain the same]
+      // I'll include them but they're unchanged except for the array safety checks
+
+async function handleSelectMenuInteraction(
+  interaction: any,
+  state: SelectAllState,
+  sentMessage: Message
+) {
+  const value = interaction.values[0];
+
+  switch (interaction.customId) {
+    case 'main_select':
+      await handleMainMenuSelection(interaction, value, state, sentMessage);
+      break;
+    case 'race_select':
+      // ✅ FIX: Update the selection state AND update the view
+      state.selectionManager.setSelectedRace(value);
+      await updateRaceView(interaction, state); // This was missing or not working
+      break;
+    case 'class_select':
+      state.selectionManager.setSelectedClass(value);
+      await updateClassView(interaction, state);
+      break;
+    case 'deck_fast_select':
+      await handleDeckFastSelect(interaction, value, state, sentMessage);
+      break;
+  }
+}
+
+
+      async function handleButtonInteraction(
+        interaction: any,
+        state: SelectAllState,
+        sentMessage: Message
+      ) {
+        switch (interaction.customId) {
+          case 'back_to_main':
+            state.currentView = 'main';
+            await interaction.update(await createMainMenu());
+            break;
+          case 'confirm_race':
+            await confirmRace(interaction, state, sentMessage);
+            break;
+          case 'confirm_class':
+            await confirmClass(interaction, state, sentMessage);
+            break;
+          case 'deck_save':
+            await saveDeck(interaction, state, sentMessage);
+            break;
+          case 'deck_reset':
+            await resetDeck(interaction, state);
+            break;
+          case 'deck_auto':
+            await autofillDeck(interaction, state);
+            break;
+          case 'deck_clear':
+            await clearDeck(interaction, state);
+            break;
+          case 'deck_back':
+            state.currentView = 'main';
+            await interaction.update(await createMainMenu());
+            break;
+          default:
+            if (interaction.customId.startsWith('deck_slot')) {
+              await handleDeckSlot(interaction, state);
+            }
+        }
+      }
+
+      async function handleMainMenuSelection(
+        interaction: any,
+        value: string,
+        state: SelectAllState,
+        sentMessage: Message
+      ) {
+        await interaction.deferUpdate();
+
+        switch (value) {
+          case 'select_race':
+            state.currentView = 'race';
+            const raceData = state.selectionManager.createRaceComponents();
+            await sentMessage.edit(raceData);
+            break;
+          case 'select_class':
+            state.currentView = 'class';
+            const classData = state.selectionManager.createClassComponents();
+            await sentMessage.edit(classData);
+            break;
+          case 'select_battle_deck':
+            await initializeDeck('battle', state, sentMessage);
+            break;
+          case 'select_arena_deck':
+            await initializeDeck('arena', state, sentMessage);
+            break;
+          case 'select_dungeon_deck':
+            await initializeDeck('dungeon', state, sentMessage);
+            break;
+        }
+      }
+
+      async function initializeDeck(
+        deckType: string,
+        state: SelectAllState,
+        sentMessage: Message
+      ) {
+        state.currentView = 'deck';
+        state.deckManager = new DeckManager(message.author.id, deckType);
+        
+        const success = await state.deckManager.loadDeck();
+        if (!success) {
+          await sentMessage.edit({
+            embeds: [new EmbedBuilder()
+              .setTitle('❌ Error')
+              .setDescription('Failed to load deck data. Please try again.')
+              .setColor('#FF0000')],
+            components: []
+          });
+          return;
+        }
+
+        const embed = state.deckManager.createDeckEmbed();
+        const components = state.deckManager.createComponents();
+
+        await sentMessage.edit({
+          embeds: [embed],
+          components
+        });
+      }
+
+async function updateRaceView(interaction: any, state: SelectAllState) {
+  const raceData = state.selectionManager.createRaceComponents();
+  await interaction.update({
+    embeds: [raceData.embed],    // ✅ Convert to array
+    components: raceData.components
+  });
+}
+
+async function updateClassView(interaction: any, state: SelectAllState) {
+  const classData = state.selectionManager.createClassComponents();
+  await interaction.update({
+    embeds: [classData.embed],   // ✅ Convert to array
+    components: classData.components
+  });
+}
+
+
+      async function confirmRace(interaction: any, state: SelectAllState, sentMessage: Message) {
+        await interaction.deferUpdate();
+        const result = await state.selectionManager.saveRace();
+        
+        if (result.success) {
+          const raceState = state.selectionManager.getState();
+          const raceName = raceState.selectedRace?.replace('race-', '') || '';
+          
+          const successEmbed = new EmbedBuilder()
+            .setTitle('✅ Race Selected Successfully!')
+            .setDescription(`You have selected the **${raceName}** race. Your base stats have been updated.`)
+            .setColor('#00FF00');
+
+          await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+          
+          state.currentView = 'main';
+          await sentMessage.edit(await createMainMenu());
+        } else {
+          await interaction.followUp({
+            content: `❌ ${result.error}`,
+            ephemeral: true
+          });
+        }
+      }
+
+      async function confirmClass(interaction: any, state: SelectAllState, sentMessage: Message) {
+        await interaction.deferUpdate();
+        const result = await state.selectionManager.saveClass();
+        
+        if (result.success) {
+          const classState = state.selectionManager.getState();
+          const className = classState.selectedClass?.replace('class-', '') || '';
+          
+          const successEmbed = new EmbedBuilder()
+            .setTitle('✅ Class Selected Successfully!')
+            .setDescription(`You have selected the **${className}** class. Your character abilities have been updated.`)
+            .setColor('#00FF00');
+
+          await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+          
+          state.currentView = 'main';
+          await sentMessage.edit(await createMainMenu());
+        } else {
+          await interaction.followUp({
+            content: `❌ ${result.error}`,
+            ephemeral: true
+          });
+        }
+      }
+
+      async function saveDeck(interaction: any, state: SelectAllState, sentMessage: Message) {
+        if (!state.deckManager) return;
+        
+        await interaction.deferUpdate();
+        const success = await state.deckManager.saveDeck();
+        
+        if (success) {
+          const config = state.deckManager.getConfig();
+          const successEmbed = new EmbedBuilder()
+            .setTitle('✅ Deck Saved Successfully!')
+            .setDescription(`Your ${config.name.toLowerCase()} has been saved and is ready for use.`)
+            .setColor('#00FF00');
+
+          await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+          
+          state.currentView = 'main';
+          await sentMessage.edit(await createMainMenu());
+        } else {
+          await interaction.followUp({
+            content: '❌ Failed to save deck. Please try again.',
+            ephemeral: true
+          });
+        }
+      }
+
+      async function resetDeck(interaction: any, state: SelectAllState) {
+        if (!state.deckManager) return;
+        
+        state.deckManager.resetDeck();
+        const embed = state.deckManager.createDeckEmbed();
+        const components = state.deckManager.createComponents();
+        
+        await interaction.update({
+          embeds: [embed],
+          components
+        });
+      }
+
+      async function clearDeck(interaction: any, state: SelectAllState) {
+        if (!state.deckManager) return;
+        
+        state.deckManager.clearDeck();
+        const embed = state.deckManager.createDeckEmbed();
+        const components = state.deckManager.createComponents();
+        
+        await interaction.update({
+          embeds: [embed],
+          components
+        });
+      }
+
+      async function autofillDeck(interaction: any, state: SelectAllState) {
+        if (!state.deckManager) return;
+        
+        await interaction.deferUpdate();
+        const success = await state.deckManager.autoFillDeck();
+        
+        if (success) {
+          const embed = state.deckManager.createDeckEmbed();
+          const components = state.deckManager.createComponents();
+          
+          await interaction.editReply({
+            embeds: [embed],
+            components
+          });
+        } else {
+          await interaction.followUp({
+            content: '❌ Failed to auto-fill deck. Make sure you have familiars in your collection.',
+            ephemeral: true
+          });
+        }
+      }
+
+      async function handleDeckSlot(interaction: any, state: SelectAllState) {
+        if (!state.deckManager) return;
+        
+        const slotNumber = parseInt(interaction.customId.replace('deck_slot', ''), 10);
+        const config = state.deckManager.getConfig();
+        const modal = createSlotModal(slotNumber, config.name);
+        
+        await interaction.showModal(modal);
+      }
+
+      async function handleDeckFastSelect(
+        interaction: any,
+        value: string,
+        state: SelectAllState,
+        sentMessage: Message
+      ) {
+        if (!state.deckManager) return;
+        
+        if (value === 'select_deck_fast') {
+          const config = state.deckManager.getConfig();
+          const modal = createFastInputModal(config.name, config.maxSlots);
+          await interaction.showModal(modal);
+        } else if (value === 'auto_select') {
+          await interaction.deferUpdate();
+          const success = await state.deckManager.autoFillDeck();
+          
+          if (success) {
+            const embed = state.deckManager.createDeckEmbed();
+            const components = state.deckManager.createComponents();
+            
+            await interaction.editReply({
+              embeds: [embed],
+              components
+            });
+          } else {
+            await interaction.followUp({
+              content: '❌ Failed to auto-fill deck.',
+              ephemeral: true
+            });
+          }
+        } else if (value === 'copy_battle') {
+          await interaction.deferUpdate();
+          const result = await state.deckManager.copyFromBattleDeck();
+          
+          if (result.success) {
+            const embed = state.deckManager.createDeckEmbed();
+            const components = state.deckManager.createComponents();
+            
+            await interaction.editReply({
+              embeds: [embed],
+              components
+            });
+          } else {
+            await interaction.followUp({
+              content: `❌ ${result.error}`,
+              ephemeral: true
+            });
+          }
+        }
+      }
+
+      async function handleFastDeckInput(
+        interaction: any,
+        state: SelectAllState,
+        sentMessage: Message
+      ) {
+        if (!state.deckManager) return;
+        
+        const inputValues = interaction.fields.getTextInputValue("deck_input_fast_select");
+        const inputs = inputValues.trim().split(/\s+/);
+        
+        const result = await state.deckManager.handleFastInput(inputs);
+        
+        if (result.success) {
+          const embed = state.deckManager.createDeckEmbed();
+          const components = state.deckManager.createComponents();
+          
+          await interaction.update({
+            embeds: [embed],
+            components
+          });
+        } else {
+          await interaction.reply({
+            content: `❌ ${result.error}`,
+            ephemeral: true
+          });
+        }
+      }
+
+      async function handleSlotInput(
+        interaction: any,
+        state: SelectAllState,
+        sentMessage: Message
+      ) {
+        if (!state.deckManager) return;
+        
+        const slotNumber = parseInt(interaction.customId.replace('deck_modal_', ''), 10);
+        const input = interaction.fields.getTextInputValue(`deck_input_${slotNumber}`);
+        
+        const result = await state.deckManager.handleSlotInput(slotNumber, input);
+        
+        if (result.success) {
+          const embed = state.deckManager.createDeckEmbed();
+          const components = state.deckManager.createComponents();
+          
+          await interaction.update({
+            embeds: [embed],
+            components
+          });
+        } else {
+          await interaction.reply({
+            content: `❌ ${result.error}`,
+            ephemeral: true
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('SelectAll command error:', error);
+      await message.reply({
+        embeds: [new EmbedBuilder()
+          .setTitle('❌ Configuration Error')
+          .setDescription('An error occurred while loading the configuration menu. Please try again in a moment.')
+          .setColor('#FF0000')]
+      });
     }
   },
 };
+
 export default selectAllCommand;

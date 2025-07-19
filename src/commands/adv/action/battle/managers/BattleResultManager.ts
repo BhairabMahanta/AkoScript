@@ -10,7 +10,25 @@ export class BattleResultManager {
   constructor(battle: any) {
     this.battle = battle;
   }
+  async handleVictory(): Promise<void> {
+    console.log("[BattleResultManager] Handling victory");
+    
+    if (this.battle.mode === 'pve') {
+      await this.handlePvEVictory();
+    } else {
+      await this.handlePvPVictory();
+    }
+  }
 
+  async handleDefeat(): Promise<void> {
+    console.log("[BattleResultManager] Handling defeat");
+    
+    if (this.battle.mode === 'pve') {
+      await this.handlePvEDefeat();
+    } else {
+      await this.handlePvPDefeat();
+    }
+  }
   async printBattleResult(): Promise<void> {
     const state = this.battle.stateManager.getState();
     

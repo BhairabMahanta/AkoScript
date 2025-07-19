@@ -1,8 +1,8 @@
+// types/BattleTypes.ts
 import { interfaceScenario } from "../../../../../data/mongo/scenarioInterface";
 import { ExtendedPlayer } from "../../../../gamelogic/buffdebufflogic";
 import { BattleMode } from "../battle";
 
-// types/BattleTypes.ts
 export interface BattleConfig {
   player: ExtendedPlayer;
   enemy?: ExtendedEnemy; // Made optional for PvP
@@ -11,12 +11,16 @@ export interface BattleConfig {
   scenario?: interfaceScenario | null; // Made optional for PvP
   mode?: BattleMode; // Added mode support
 }
+
 export interface ExtendedEnemy extends Enemy {
   floorNum: number;
-}interface hasAllies {
+}
+
+interface hasAllies {
   name: string;
   element: string;
 }
+
 export interface Enemy {
   type: string;
   name: string;
@@ -25,6 +29,14 @@ export interface Enemy {
   hasAllies: hasAllies[];
   rewards: any;
 }
+
+// NEW: Player targeting interface
+export interface PlayerTargetData {
+  selectedTarget: any;
+  lastSelectedTime: number;
+  autoSelected: boolean;
+}
+
 export interface BattleState {
   currentTurn: ExtendedPlayer | null;
   currentTurnIndex: number;
@@ -42,6 +54,11 @@ export interface BattleState {
   taunted: boolean;
   dodge: { option: any; id: any };
   nextTurnHappenedCounter: number;
+  
+  // NEW: Per-player persistent targeting
+  playerTargets: {
+    [playerId: string]: PlayerTargetData;
+  };
 }
 
 export interface DodgeResult {

@@ -2,6 +2,7 @@
 import { generateAttackBarEmoji } from '../../../../util/glogic';
 import { cycleCooldowns } from '../../../../util/glogic';
 import { PvPAI } from '../../../ai/pvp';
+import { ExtendedPlayer } from '../../../../gamelogic/buffdebufflogic';
 
 export class TurnManager {
   private battle: any;
@@ -9,12 +10,8 @@ export class TurnManager {
 
   constructor(battle: any) {
     this.battle = battle;
-    
-    // DON'T initialize PvP AI here - it's too early
-    // We'll initialize it later when the battle is fully set up
   }
 
-  // NEW: Method to initialize PvP AI after Battle is fully constructed
   public initializePvPAI(): void {
     if (this.battle.mode === 'pvp_afk' && this.battle.player2) {
       console.log("[TurnManager] Initializing PvP AI for AFK mode");
@@ -23,10 +20,9 @@ export class TurnManager {
     }
   }
 
-  async getNextTurn(): Promise<any> {
+  async getNextTurn(): Promise<ExtendedPlayer | null> {
     console.log("[TurnManager] Getting next turn...");
     
-    // Initialize PvP AI if not already done (safety check)
     if (this.battle.mode === 'pvp_afk' && !this.pvpAI && this.battle.player2) {
       this.initializePvPAI();
     }
@@ -34,7 +30,7 @@ export class TurnManager {
     const state = this.battle.stateManager.getState();
     const charactersWith100AtkBar = await this.battle.barManager.fillAtkBars(this.battle.characters);
 
-    let nextTurn = null;
+    let nextTurn: ExtendedPlayer | null = null;
 
     if (charactersWith100AtkBar.length === 1) {
       nextTurn = charactersWith100AtkBar[0];
@@ -44,24 +40,23 @@ export class TurnManager {
     }
 
     if (nextTurn) {
-      // Check if the character is still alive before setting as current turn
       if (nextTurn.stats.hp <= 0) {
         console.log(`[TurnManager] ${nextTurn.name} is dead, skipping turn`);
         nextTurn.atkBar = 0;
         nextTurn.stats.speed = 0;
         
-        // Recursively get next valid turn
+        this.clearTargetsForDeadCharacter(nextTurn);
+        
         return await this.getNextTurn();
       }
 
       console.log(`[TurnManager] Setting current turn to: ${nextTurn.name}`);
       
+      this.validateTargetsForNewTurn(nextTurn);
+      
       this.battle.stateManager.updateState({
         currentTurn: nextTurn,
-        currentTurnId: nextTurn._id || nextTurn.id,
-        // Reset targeting state for new turn
-        pickedChoice: false,
-        enemyToHit: null
+        currentTurnIndex: state.currentTurnIndex + 1,
       });
 
       nextTurn.atkBar -= 100;
@@ -74,7 +69,6 @@ export class TurnManager {
       await this.battle.battleResultManager.printBattleResult();
     }
 
-    // Handle turn execution based on mode
     if (this.battle.mode === 'pve') {
       await this.handlePvETurn(nextTurn);
     } else {
@@ -88,7 +82,7 @@ export class TurnManager {
     return nextTurn;
   }
 
-  private async handlePvETurn(currentTurn: any): Promise<void> {
+  private async handlePvETurn(currentTurn: any | null): Promise<void> {
     console.log(`[TurnManager] Handling PvE turn for: ${currentTurn?.name}`);
     
     const state = this.battle.stateManager.getState();
@@ -96,53 +90,42 @@ export class TurnManager {
       (enemy: any) => enemy.name === currentTurn?.name
     );
 
-    // If this is an enemy turn, execute AI
     if (currentEnemy && currentTurn?.stats.hp > 0) {
       console.log(`[TurnManager] Executing enemy AI for: ${currentTurn.name}`);
       await this.performEnemyTurn(currentTurn, currentEnemy);
-      
-      // After enemy turn, continue to next turn
       await this.continueToNextTurn();
     } else {
       console.log(`[TurnManager] Player turn: ${currentTurn?.name}`);
-      // For player turns, wait for interaction
     }
   }
 
-  private async handlePvPTurn(currentTurn: any): Promise<void> {
+  private async handlePvPTurn(currentTurn: any | null): Promise<void> {
     console.log(`[TurnManager] Handling PvP turn for: ${currentTurn?.name}`);
     
-    // Check if this is an AI player's turn in AFK mode
     if (this.battle.mode === 'pvp_afk' && this.isAIPlayerTurn(currentTurn)) {
-      console.log(`[TurnManager] Executing AI turn for: ${currentTurn.name}`);
+      console.log(`[TurnManager] Executing AI turn for: ${currentTurn?.name}`);
       await this.executeAITurn(currentTurn);
     } else {
       console.log(`[TurnManager] Human player turn: ${currentTurn?.name}`);
-      // For human player turns, wait for interaction
-      // NO WAITING - the UI system will handle this automatically
     }
   }
 
-  private isAIPlayerTurn(currentTurn: any): boolean {
+  private isAIPlayerTurn(currentTurn: any | null): boolean {
     if (!currentTurn || !this.battle.player2) return false;
     
     const player2Id = this.battle.player2.id || this.battle.player2._id;
     
-    // Check if it's player2 themselves
     if (currentTurn.id === player2Id || currentTurn._id === player2Id) {
       return true;
     }
     
-    // Check if it's player2's familiar
-    const isPlayer2Familiar = this.battle.player2FamiliarInfo.some((f: any) => 
+    return this.battle.player2FamiliarInfo.some((f: any) => 
       f.serialId === currentTurn.serialId && f.name === currentTurn.name
     );
-    
-    return isPlayer2Familiar;
   }
 
-  private async executeAITurn(currentTurn: any): Promise<void> {
-    if (!this.pvpAI) {
+  private async executeAITurn(currentTurn: any | null): Promise<void> {
+    if (!this.pvpAI || !currentTurn) {
       console.error("[TurnManager] PvP AI not initialized");
       await this.executeAIFallback(currentTurn);
       return;
@@ -151,7 +134,6 @@ export class TurnManager {
     try {
       console.log(`[TurnManager] AI executing turn for: ${currentTurn.name}`);
       
-      // Get available targets for AI
       const availableTargets = this.pvpAI.getAvailableTargets();
       
       if (availableTargets.length === 0) {
@@ -160,14 +142,10 @@ export class TurnManager {
         return;
       }
       
-      // AI makes decision
       const decision = await this.pvpAI.makeDecision(currentTurn, availableTargets);
       console.log(`[TurnManager] AI decision: ${decision.action} - ${decision.reasoning}`);
       
-      // Execute the decision
       await this.pvpAI.executeDecision(decision);
-      
-      // IMPORTANT: Continue to next turn automatically - NO WAITING!
       await this.continueToNextTurn();
       
     } catch (error) {
@@ -176,17 +154,20 @@ export class TurnManager {
     }
   }
 
-  private async executeAIFallback(currentTurn: any): Promise<void> {
+  private async executeAIFallback(currentTurn: any | null): Promise<void> {
     console.log("[TurnManager] Executing AI fallback action");
     
+    if (!currentTurn) return;
+    
     try {
-      // Simple fallback - attack the first available target
-      const state = this.battle.stateManager.getState();
       const availableTargets = [this.battle.player, ...this.battle.familiarInfo]
         .filter((target: any) => target && target.stats && target.stats.hp > 0);
       
       if (availableTargets.length > 0) {
         const randomTarget = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+        
+        const currentPlayerId = this.battle.player2.id || this.battle.player2._id;
+        this.battle.stateManager.setPlayerTarget(currentPlayerId, randomTarget, true);
         
         this.battle.stateManager.updateState({
           enemyToHit: randomTarget,
@@ -203,8 +184,90 @@ export class TurnManager {
     await this.continueToNextTurn();
   }
 
-  // Rest of your existing methods remain the same...
-  private async performEnemyTurn(currentTurn: any, currentEnemy: any): Promise<void> {
+  private clearTargetsForDeadCharacter(deadCharacter: any): void {
+    const state = this.battle.stateManager.getState();
+    
+    Object.keys(state.playerTargets).forEach(playerId => {
+      const target = this.battle.stateManager.getPlayerTarget(playerId);
+      if (target && (
+        target.id === deadCharacter.id || 
+        target._id === deadCharacter._id || 
+        target.serialId === deadCharacter.serialId
+      )) {
+        this.battle.stateManager.clearPlayerTarget(playerId);
+        console.log(`[TurnManager] Cleared target for player ${playerId} due to character death: ${deadCharacter.name}`);
+      }
+    });
+  }
+
+  private validateTargetsForNewTurn(currentTurn: ExtendedPlayer): void {
+    const state = this.battle.stateManager.getState();
+    const currentPlayerId = this.getCurrentPlayerIdForCharacter(currentTurn);
+    
+    if (currentPlayerId) {
+      const availableTargets = this.getAvailableTargetsForPlayer(currentPlayerId);
+      
+      const isValidTarget = this.battle.stateManager.validatePlayerTarget(currentPlayerId, availableTargets);
+      
+      if (!isValidTarget && availableTargets.length === 1) {
+        this.battle.stateManager.setPlayerTarget(currentPlayerId, availableTargets[0], true);
+        console.log(`[TurnManager] Auto-selected target for ${currentTurn.name}: ${availableTargets[0].name}`);
+      }
+    }
+  }
+
+  private getCurrentPlayerIdForCharacter(character: any): string {
+    if (!character) return '';
+    
+    if (this.battle.mode === 'pve') {
+      return this.battle.player.id;
+    }
+    
+    const player1Id = this.battle.player.id || this.battle.player._id;
+    const player2Id = this.battle.player2.id || this.battle.player2._id;
+    
+    if (character.id === player1Id || character._id === player1Id) {
+      return player1Id;
+    }
+    
+    if (this.battle.familiarInfo.some((f: any) => 
+      f.serialId === character.serialId && f.name === character.name
+    )) {
+      return player1Id;
+    }
+    
+    if (character.id === player2Id || character._id === player2Id) {
+      return player2Id;
+    }
+    
+    if (this.battle.player2FamiliarInfo.some((f: any) => 
+      f.serialId === character.serialId && f.name === character.name
+    )) {
+      return player2Id;
+    }
+    
+    return '';
+  }
+
+  private getAvailableTargetsForPlayer(playerId: string): any[] {
+    const state = this.battle.stateManager.getState();
+    
+    if (this.battle.mode === 'pve') {
+      return state.aliveEnemies || [];
+    }
+    
+    const player1Id = this.battle.player.id || this.battle.player._id;
+    
+    if (playerId === player1Id) {
+      return [this.battle.player2, ...this.battle.player2FamiliarInfo]
+        .filter(target => target && target.stats && target.stats.hp > 0);
+    } else {
+      return [this.battle.player, ...this.battle.familiarInfo]
+        .filter(target => target && target.stats && target.stats.hp > 0);
+    }
+  }
+
+  private async performEnemyTurn(currentTurn: ExtendedPlayer, currentEnemy: any): Promise<void> {
     console.log(`[TurnManager] Performing enemy turn for: ${currentTurn.name}`);
     
     if (currentTurn?.stats.hp <= 0) {
@@ -253,7 +316,7 @@ export class TurnManager {
       return;
     }
     
-    console.log(`[TurnManager] Player ${state.currentTurn.name} attacking ${state.enemyToHit.name}`);
+    console.log(`[TurnManager] Player ${state.currentTurn?.name} attacking ${state.enemyToHit.name}`);
     
     await this.battle.combatResolver.executeBasicAttack(
       state.currentTurn,

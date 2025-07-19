@@ -361,10 +361,10 @@ function capitalizeFirstLetter(string: string): string {
 }
 // Define the types for Gacha Types and Drop Rates
 export const GACHA_TYPES = {
-  COMMON_TOKEN: "commonScroll",
-  RARE_TOKEN: "rareScroll",
-  LEGENDARY_TOKEN: "legendaryScroll",
-} as const; // 'as const' ensures these values are treated as literal types
+  COMMON_TOKEN: "COMMON_TOKEN",
+  RARE_TOKEN: "RARE_TOKEN", 
+  LEGENDARY_TOKEN: "LEGENDARY_TOKEN",
+} as const;
 
 // Define types for the drop rates
 export interface DropRates {
@@ -378,29 +378,44 @@ interface AllFamiliars {
   [tier: string]: { [key: string]: any }; // 'any' can be replaced with the actual familiar type
 }
 
+// ✅ UPDATE: Use GACHA_TYPES keys instead of database field names
 const DROP_RATES: Record<string, DropRates> = {
-  commonScroll: { tier1: 80, tier2: 18, tier3: 2 },
-  rareScroll: { tier1: 50, tier2: 40, tier3: 10 },
-  legendaryScroll: { tier1: 20, tier2: 50, tier3: 30 },
+  [GACHA_TYPES.COMMON_TOKEN]: { tier1: 80, tier2: 18, tier3: 2 },
+  [GACHA_TYPES.RARE_TOKEN]: { tier1: 50, tier2: 40, tier3: 10 },
+  [GACHA_TYPES.LEGENDARY_TOKEN]: { tier1: 20, tier2: 50, tier3: 30 },
 };
 
 export async function pullGacha(
   playerId: string,
   gachaType: keyof typeof GACHA_TYPES
 ): Promise<any> {
-  // Get the rates from the DROP_RATES object
+  // ✅ Now this will work because DROP_RATES uses the same keys as GACHA_TYPES
   const rates = DROP_RATES[gachaType];
+  
+  // ✅ Add error checking for undefined rates
+  if (!rates) {
+    throw new Error(`Invalid gacha type: ${gachaType}. Available types: ${Object.keys(DROP_RATES).join(', ')}`);
+  }
 
   // Get the tier based on the rates
   const tier = getTier(rates);
   const tierKey = `Tier${tier}` as keyof AllFamiliars;
 
+  // ✅ Add error checking for missing tier data
+  if (!allFamiliars[tierKey]) {
+    throw new Error(`No familiars found for ${tierKey}`);
+  }
+
   // Assuming allFamiliars is defined somewhere in your code
   const characters = Object.keys(allFamiliars[tierKey]);
+  
+  // ✅ Add error checking for empty character list
+  if (characters.length === 0) {
+    throw new Error(`No characters available in ${tierKey}`);
+  }
 
   // Randomly select a character from the tier
-  const selectedCharacter =
-    characters[Math.floor(Math.random() * characters.length)];
+  const selectedCharacter = characters[Math.floor(Math.random() * characters.length)];
 
   // Update the player's card collection in the database
   const filter = { _id: playerId };
@@ -408,11 +423,21 @@ export async function pullGacha(
 
   await collection.updateOne(filter, update);
 
-  // Return the selected character's data from allFamiliars
-  return allFamiliars[tierKey][selectedCharacter];
+  // ✅ Add the tier information to the returned character
+  const characterData = allFamiliars[tierKey][selectedCharacter];
+  return {
+    ...characterData,
+    tier: tier, // Ensure tier is included in the returned data
+    name: selectedCharacter // Ensure name is included
+  };
 }
 
 export function getTier(rates: DropRates): number {
+  // ✅ Add error checking for undefined rates
+  if (!rates || typeof rates.tier1 === 'undefined' || typeof rates.tier2 === 'undefined') {
+    throw new Error('Invalid drop rates provided');
+  }
+
   const rand = Math.random() * 100;
   if (rand < rates.tier1) return 1;
   if (rand < rates.tier1 + rates.tier2) return 2;
