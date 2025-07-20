@@ -65,7 +65,6 @@ export interface ExtendedClient extends Client {
   commandCategories: Map<string, Command[]>;
   interactions: Collection<string, SlashCommand>;
   safemode: boolean;
-  generateHelpEmbed: (command: Command, message: Message) => EmbedBuilder;
   db: {
     GuildSettings: typeof GuildSettingsModel;
   };
@@ -77,12 +76,12 @@ export class CommandHandler {
   private cooldowns: Collection<string, Collection<string, number>>;
   private globalCooldowns = new Collection<string, number>();
   private spamCache = new Collection<string, number>();
+  
   constructor(client: ExtendedClient, config: BotConfig) {
     this.client = client;
     this.client.config = config;
     this.client.commands = new Collection();
     this.client.commandCategories = new Map();
-    this.client.generateHelpEmbed = this.generateHelpEmbed.bind(this);
     this.client.interactions = new Collection();
     this.client.db = { GuildSettings: GuildSettingsModel };
     this.cooldowns = new Collection();
@@ -173,29 +172,6 @@ export class CommandHandler {
 
     const settings = await this.client.db.GuildSettings.findOne({ guildId });
     return settings?.prefix || this.client.config.defaultPrefix;
-  }
-
-  // Generate help embed
-  public generateHelpEmbed(): EmbedBuilder {
-    const embed = new EmbedBuilder()
-      .setColor("Aqua")
-      .setTitle("Command Help")
-      .setDescription(
-        `Use ${this.client.config.defaultPrefix}help [command] for more info`
-      );
-
-    this.client.commandCategories.forEach((commands, category) => {
-      const commandList = commands
-        .filter((cmd) => !cmd.requiredRoles)
-        .map((cmd) => `• \`${cmd.name}\` - ${cmd.description}`)
-        .join("\n");
-
-      if (commandList.length > 0) {
-        embed.addFields({ name: `**${category}**`, value: commandList });
-      }
-    });
-
-    return embed;
   }
 
   // Handle commands with enhanced features
@@ -292,7 +268,6 @@ export class CommandHandler {
     }, 5000);
 
     // Execute command
-    // Update execute section
     try {
       // Add validation check
       const validation = this.validateInput(command, args, message);

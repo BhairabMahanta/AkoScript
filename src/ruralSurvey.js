@@ -173,8 +173,8 @@ async function automateMultiSectionForm(formUrl, submissionCount = 50, tabCount 
 }
 
 // Usage
-const formUrl = 'https://docs.google.com/forms/d/1kcony0sOP5w3jx0blHrpQCfxAR354O4iZYQxq_o1uVY/viewform';
-automateMultiSectionForm(formUrl, 10, 5).catch(console.error);
+const formUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSeIUJNqS4Zc_-zOk1bkq93oeyOk3vEZj3lZlTFXv64qusz_Pg/viewform';
+automateMultiSectionForm(formUrl, 2, 5).catch(console.error);
 
 
 

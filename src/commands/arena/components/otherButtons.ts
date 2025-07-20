@@ -2,39 +2,11 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelec
 import { ExtendedClient } from "../../..";
 import { PlayerModal } from "../../../data/mongo/playerschema";
 
-// ✅ SMART RESPONSE UTILITY - Add this at the top
-class SmartResponder {
-  static async update(interaction: any, content: any): Promise<any> {
-    if (interaction.deferred || interaction.replied) {
-      console.log('📝 Using editReply for acknowledged interaction');
-      return await interaction.editReply(content);
-    } else {
-      console.log('🔄 Using update for fresh interaction');
-      return await interaction.update(content);
-    }
-  }
-
-  static async reply(interaction: any, content: any): Promise<any> {
-    if (interaction.deferred) {
-      console.log('📝 Using editReply for deferred interaction');
-      return await interaction.editReply(content);
-    } else if (interaction.replied) {
-      console.log('🔄 Using followUp for replied interaction');
-      return await interaction.followUp(content);
-    } else {
-      console.log('✨ Using reply for fresh interaction');
-      return await interaction.reply(content);
-    }
-  }
-}
-
-// Leaderboard Menu - Show arena rankings
 export async function showLeaderboardMenu(interaction: any, client: ExtendedClient): Promise<void> {
   try {
     const playerId = interaction.user.id;
     const playerData = await PlayerModal.findById(playerId);
     
-    // Get top 10 players
     const topPlayers = await PlayerModal.find({
       'arena.isInitialized': true,
       'arena.rating': { $gte: 1000 }
@@ -43,13 +15,11 @@ export async function showLeaderboardMenu(interaction: any, client: ExtendedClie
     .sort({ 'arena.rating': -1 })
     .limit(10);
 
-    // Find player's rank
     const playerRank = await PlayerModal.countDocuments({
       'arena.rating': { $gt: playerData?.arena.rating || 1000 },
       'arena.isInitialized': true
     }) + 1;
 
-    // Format leaderboard
     const leaderboardText = topPlayers.map((player, index) => {
       const winRate = player.arena.totalWins + player.arena.totalLosses > 0 ? 
         Math.round((player.arena.totalWins / (player.arena.totalWins + player.arena.totalLosses)) * 100) : 0;
@@ -101,8 +71,7 @@ export async function showLeaderboardMenu(interaction: any, client: ExtendedClie
           .setStyle(ButtonStyle.Secondary)
       );
 
-    // ✅ FIXED: Use smart responder instead of direct update
-    await SmartResponder.update(interaction, {
+    await interaction.editReply({
       embeds: [embed],
       components: [leaderboardButtons]
     });
@@ -114,22 +83,20 @@ export async function showLeaderboardMenu(interaction: any, client: ExtendedClie
       .setDescription('Failed to load leaderboard. Please try again.')
       .setColor('#FF0000');
     
-    // ✅ FIXED: Use smart responder for error handling too
-    await SmartResponder.update(interaction, { embeds: [errorEmbed], components: [] });
+    await interaction.editReply({ embeds: [errorEmbed], components: [] });
   }
 }
 
-// Stats Menu - Detailed arena statistics
 export async function showStatsMenu(interaction: any, client: ExtendedClient): Promise<void> {
   try {
     const playerId = interaction.user.id;
     const playerData = await PlayerModal.findById(playerId);
     
     if (!playerData) {
-      // ✅ FIXED: Use smart responder
-      await SmartResponder.reply(interaction, { 
+      await interaction.editReply({ 
         content: '❌ Player data not found!', 
-        ephemeral: true 
+        embeds: [], 
+        components: [] 
       });
       return;
     }
@@ -140,8 +107,7 @@ export async function showStatsMenu(interaction: any, client: ExtendedClient): P
     const defenseTotal = arena.defenseWins + arena.defenseLosses;
     const defenseWinRate = defenseTotal > 0 ? Math.round((arena.defenseWins / defenseTotal) * 100) : 0;
     
-    // Calculate rating gain/loss potential
-    const ratingChange = arena.rating - 1000; // Assuming 1000 is starting rating
+    const ratingChange = arena.rating - 1000;
     
     const embed = new EmbedBuilder()
       .setTitle('📊 **Arena Analytics Dashboard**')
@@ -206,44 +172,39 @@ export async function showStatsMenu(interaction: any, client: ExtendedClient): P
           .setStyle(ButtonStyle.Secondary)
       );
 
-    // ✅ FIXED: Use smart responder
-    await SmartResponder.reply(interaction, { 
+    await interaction.editReply({ 
       embeds: [embed], 
-      components: [statsButtons, backButton],
-      ephemeral: true 
+      components: [statsButtons, backButton]
     });
 
   } catch (error) {
     console.error('Error in showStatsMenu:', error);
-    // ✅ FIXED: Use smart responder for error handling
-    await SmartResponder.reply(interaction, { 
+    await interaction.editReply({ 
       content: '❌ Failed to load statistics. Please try again.', 
-      ephemeral: true 
+      embeds: [], 
+      components: [] 
     });
   }
 }
 
-// Rewards Menu - Season and achievement rewards
 export async function showRewardsMenu(interaction: any, client: ExtendedClient): Promise<void> {
   try {
     const playerId = interaction.user.id;
     const playerData = await PlayerModal.findById(playerId);
     
     if (!playerData) {
-      // ✅ FIXED: Use smart responder
-      await SmartResponder.reply(interaction, { 
+      await interaction.editReply({ 
         content: '❌ Player data not found!', 
-        ephemeral: true 
+        embeds: [], 
+        components: [] 
       });
       return;
     }
 
     const arena = playerData.arena;
     
-    // Calculate available rewards based on performance
     const availableRewards = [];
     
-    // Daily rewards
     if (arena.totalWins > 0) {
       availableRewards.push({
         type: 'Daily Victory',
@@ -252,15 +213,13 @@ export async function showRewardsMenu(interaction: any, client: ExtendedClient):
       });
     }
     
-    // Weekly rewards based on rank
     const weeklyReward = getWeeklyReward(arena.rank);
     availableRewards.push({
       type: 'Weekly Rank Reward',
       reward: weeklyReward,
-      claimable: arena.totalWins >= 5 // Need at least 5 wins
+      claimable: arena.totalWins >= 5
     });
     
-    // Achievement rewards
     if (arena.totalWins >= 10) {
       availableRewards.push({
         type: 'Champion Achievement',
@@ -330,24 +289,22 @@ export async function showRewardsMenu(interaction: any, client: ExtendedClient):
           .setStyle(ButtonStyle.Secondary)
       );
 
-    // ✅ FIXED: Use smart responder
-    await SmartResponder.reply(interaction, { 
+    await interaction.editReply({ 
       embeds: [embed], 
-      components: [rewardButtons, backButton],
-      ephemeral: true 
+      components: [rewardButtons, backButton]
     });
 
   } catch (error) {
     console.error('Error in showRewardsMenu:', error);
-    // ✅ FIXED: Use smart responder for error handling
-    await SmartResponder.reply(interaction, { 
+    await interaction.editReply({ 
       content: '🎁 **Reward Center Error** - Please try again later!', 
-      ephemeral: true 
+      embeds: [], 
+      components: [] 
     });
   }
 }
 
-// Helper functions remain the same...
+// Helper functions
 function getCurrentSeason(): string {
   const now = new Date();
   const year = now.getFullYear();

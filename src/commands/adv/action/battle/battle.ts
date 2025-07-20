@@ -396,7 +396,7 @@ public isPlayer2AI(): boolean {
     }
   }
 
-  private async createInitialEmbed(): Promise<{ embed: any; components: any[] }> {
+private async createInitialEmbed(): Promise<{ embed: any; components: any[] }> {
     const { EmbedBuilder, StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
     
     // Validate all values before using them
@@ -406,72 +406,102 @@ public isPlayer2AI(): boolean {
     let title: string;
     let description: string;
     
-
-      const enemyName = this.enemyDetails?.name || "Unknown Enemy";
-      title = `Fight: ${enemyName}`;
-      
-      // Handle empty familiarInfo array safely
-      let familiarNames = "None";
-      if (this.familiarInfo && this.familiarInfo.length > 0) {
+    const enemyName = this.enemyDetails?.name || "Unknown Enemy";
+    title = `⚔️ Battle Arena: ${enemyName}`;
+    
+    // Handle empty familiarInfo array safely
+    let familiarNames = "❌ None selected";
+    if (this.familiarInfo && this.familiarInfo.length > 0) {
         const validFamiliars = this.familiarInfo
-          .filter((familiar: any) => familiar && familiar.name)
-          .map((familiar: any) => familiar.name);
+            .filter((familiar: any) => familiar && familiar.name)
+            .map((familiar: any) => `🐾 ${familiar.name}`);
         
         if (validFamiliars.length > 0) {
-          familiarNames = validFamiliars.join(", ");
+            familiarNames = validFamiliars.join(", ");
         }
-      }
-      
-      description = `**Player and familiars:**
-__${playerName}__ Level: ${playerLevel}
-__Familiars selected__: ${familiarNames}
+    }
+    
+    description = `
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                    **🎮 BATTLE PREPARATION**                    
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-**Enemy Info:**
-Level: Not implemented yet
-Click on the options in the button to find **available** info about the enemies!
+👤 **Fighter:** \`${playerName}\` 
+⭐ **Level:** \`${playerLevel}\`
+🔮 **Companions:** ${familiarNames}
 
-**Automate this battle?**
-Automating has its own issues it does worse than you normally would!!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Your Power Level vs Recommended**
-- being cooked still
+🎯 **Enemy Information:**
+📊 **Level:** \`🔧 Coming Soon...\`
+💡 *Use the dropdown menu to scout enemy details!*
 
-**Difficulty**
-- cooking fr
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Start Battle**
-To start, click on the "Fight" option in the dropdown below!`;
-  
+🤖 **Auto-Battle Mode**
+⚠️ *Automation reduces battle efficiency!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ **Power Analysis:** \`🔧 In Development\`
+🎲 **Difficulty Rating:** \`🔧 Calculating...\`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 **Ready to Begin?**
+Select **"Fight"** from the dropdown to enter combat!`;
 
     const battleEmbed = new EmbedBuilder()
-      .setTitle(title)
-      .setDescription(description)
-      .setColor(0x0099ff);
+        .setTitle(title)
+        .setDescription(description)
+        .setColor(0xFF6B35) // Orange-red for battle theme
+        .setThumbnail('https://cdn.discordapp.com/emojis/1234567890123456789.png') // Add a battle icon if you have one
+        .setFooter({ 
+            text: '⚔️ Choose your actions wisely in battle!', 
+            iconURL: 'https://cdn.discordapp.com/emojis/1234567890123456789.png' 
+        })
+        .setTimestamp();
 
-    // Validate menu options
+    // Enhanced menu options with emojis
     const options = [
-      { label: "Fight", value: "klik_fight", description: "Start the battle!" },
+        { 
+            label: "⚔️ Fight", 
+            value: "klik_fight", 
+            description: "🔥 Begin the epic battle!",
+            emoji: "⚔️"
+        },
     ];
 
     if (this.mode === 'pve') {
-      options.unshift(
-        { label: "Bosses", value: "klik_bosses", description: "View boss information" },
-        { label: "Mobs", value: "klik_mobs", description: "View mob information" }
-      );
+        options.unshift(
+            { 
+                label: "👑 Bosses", 
+                value: "klik_bosses", 
+                description: "📋 Scout powerful boss enemies",
+                emoji: "👑"
+            },
+            { 
+                label: "🐺 Mobs", 
+                value: "klik_mobs", 
+                description: "📋 View regular enemy information",
+                emoji: "🐺"
+            }
+        );
     }
 
     const optionSelectMenu = new StringSelectMenuBuilder()
-      .setCustomId("option_krlo")
-      .setPlaceholder("Select an option")
-      .addOptions(options);
+        .setCustomId("option_krlo")
+        .setPlaceholder("🎯 Choose your battle action...")
+        .addOptions(options);
 
     const stringMenuRow = new ActionRowBuilder().addComponents(optionSelectMenu);
 
     return { 
-      embed: battleEmbed, 
-      components: [stringMenuRow] 
+        embed: battleEmbed, 
+        components: [stringMenuRow] 
     };
-  }
+}
+
 
   async startBattle(message: any): Promise<void> {
     console.log(`[Battle] Starting battle - Mode: ${this.mode}`);

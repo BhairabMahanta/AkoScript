@@ -3,6 +3,7 @@ import { ExtendedClient } from '../../events/handlers/commandHandler';
 import { Message } from 'discord.js';
 import { handleArenaButtonClick } from "./components/buttonHandler";
 import { createArenaMenuData } from "./arenaUtils";
+import { DefenseModalHandlers } from "./components/defenseComponents/defenseModals";
 
 import { 
   EmbedBuilder, 
@@ -25,7 +26,6 @@ const arenaCommand: Command = {
   }
 };
 
-// ✅ Main arena menu function - only for initial creation
 export async function showArenaMainMenu(
   client: ExtendedClient,
   messageOrInteraction: Message | any
@@ -49,7 +49,6 @@ export async function showArenaMainMenu(
       response = await messageOrInteraction.reply(arenaMenuData);
     }
 
-    // ✅ Always setup collector for initial menu
     await setupArenaCollector(response, playerId, client);
 
   } catch (error) {
@@ -79,7 +78,6 @@ export async function showArenaMainMenu(
   }
 }
 
-// ✅ NEW: Simple helper function to return to arena menu (NO new collectors)
 export async function returnToArenaMenu(interaction: any): Promise<void> {
   try {
     console.log('Returning to arena menu via helper function');
@@ -87,7 +85,6 @@ export async function returnToArenaMenu(interaction: any): Promise<void> {
     const playerId = interaction.user.id;
     const arenaMenuData = await createArenaMenuData(playerId);
     
-    // ✅ Simply update the message content - that's it!
     await interaction.editReply(arenaMenuData);
     
   } catch (error) {
@@ -107,7 +104,6 @@ export async function returnToArenaMenu(interaction: any): Promise<void> {
   }
 }
 
-// ✅ Collector setup function (unchanged)
 async function setupArenaCollector(response: any, playerId: string, client: ExtendedClient) {
   if (response.collector) {
     response.collector.stop('new_collector');
@@ -115,12 +111,28 @@ async function setupArenaCollector(response: any, playerId: string, client: Exte
   }
 
   const collector = response.createMessageComponentCollector({
-    componentType: ComponentType.Button,
     time: 600000
   });
 
   response.collector = collector;
   const processingInteractions = new Set();
+
+  // Modal handler for defense deck modals
+  const modalHandler = async (modalInteraction: any) => {
+    if (!modalInteraction.isModalSubmit() || modalInteraction.user.id !== playerId) return;
+
+    try {
+      if (modalInteraction.customId === 'deck_modal_fast_select') {
+        await DefenseModalHandlers.handleFastInput(modalInteraction);
+      } else if (modalInteraction.customId.startsWith('deck_modal_')) {
+        await DefenseModalHandlers.handleSlotInput(modalInteraction);
+      }
+    } catch (error) {
+      console.error('Error handling modal submission:', error);
+    }
+  };
+
+  client.on('interactionCreate', modalHandler);
 
   collector.on('collect', async (interaction: any) => {
     const interactionKey = `${interaction.id}_${interaction.customId}`;
@@ -180,6 +192,7 @@ async function setupArenaCollector(response: any, playerId: string, client: Exte
   collector.on('end', async (collected: any, reason: any) => {
     console.log(`Arena collector ended: ${reason}`);
     processingInteractions.clear();
+    client.off('interactionCreate', modalHandler);
     
     try {
       const disabledEmbed = new EmbedBuilder()

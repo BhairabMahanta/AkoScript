@@ -8,15 +8,6 @@ export async function showAttackMenu(interaction: any, client: ExtendedClient): 
     const playerId = interaction.user.id;
     const playerData = await PlayerModal.findById(playerId);
     
-    // ✅ HELPER FUNCTION: Smart response method selection
-    const respond = async (content: any) => {
-      if (interaction.deferred || interaction.replied) {
-        return await interaction.editReply(content);
-      } else {
-        return await interaction.reply(content);
-      }
-    };
-    
     if (!playerData || playerData.arena.attacksToday >= 30) {
       const embed = new EmbedBuilder()
         .setTitle('❌ **Attack Unavailable**')
@@ -33,11 +24,10 @@ export async function showAttackMenu(interaction: any, client: ExtendedClient): 
             .setStyle(ButtonStyle.Secondary)
         );
       
-      await respond({ embeds: [embed], components: [backButton] });
+      await interaction.editReply({ embeds: [embed], components: [backButton] });
       return;
     }
 
-    // Find suitable opponents
     const minRating = Math.max(1000, playerData.arena.rating - 100);
     const maxRating = playerData.arena.rating + 100;
     
@@ -65,11 +55,10 @@ export async function showAttackMenu(interaction: any, client: ExtendedClient): 
             .setStyle(ButtonStyle.Secondary)
         );
 
-      await respond({ embeds: [embed], components: [backButton] });
+      await interaction.editReply({ embeds: [embed], components: [backButton] });
       return;
     }
 
-    // Create opponent list
     const opponentList = opponents.map((opp, index) => {
       const winRate = opp.arena.totalWins + opp.arena.totalLosses > 0 ? 
         Math.round((opp.arena.totalWins / (opp.arena.totalWins + opp.arena.totalLosses)) * 100) : 0;
@@ -125,7 +114,7 @@ export async function showAttackMenu(interaction: any, client: ExtendedClient): 
         )
     ];
 
-    await respond({
+    await interaction.editReply({
       embeds: [embed],
       components: components
     });
@@ -133,20 +122,11 @@ export async function showAttackMenu(interaction: any, client: ExtendedClient): 
   } catch (error) {
     console.error('Error in showAttackMenu:', error);
     
-    try {
-      const errorEmbed = new EmbedBuilder()
-        .setTitle('❌ **Error**')
-        .setDescription('Failed to load attack menu.')
-        .setColor('#FF0000');
-      
-      // ✅ FIXED: Use smart response for error handling too
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({ embeds: [errorEmbed], components: [] });
-      } else {
-        await interaction.reply({ embeds: [errorEmbed], components: [], ephemeral: true });
-      }
-    } catch (e) {
-      console.error('Failed to send error message:', e);
-    }
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('❌ **Error**')
+      .setDescription('Failed to load attack menu.')
+      .setColor('#FF0000');
+    
+    await interaction.editReply({ embeds: [errorEmbed], components: [] });
   }
 }

@@ -28,12 +28,12 @@ import path from "path";
 import fs from "fs";
 import { MongoClient } from "mongodb";
 import { Command } from "./events/handlers/commandHandler";
+
 export class ExtendedClient extends Client {
   config: BotConfig;
   commands: Collection<string, Command>;
   commandCategories: Map<string, Command[]>;
   interactions: Collection<string, SlashCommand>;
-  generateHelpEmbed: any;
   safemode: boolean;
   db: {
     GuildSettings: typeof GuildSettingsModel;
@@ -58,13 +58,13 @@ export class ExtendedClient extends Client {
     this.config = config;
     this.commands = new Collection();
     this.commandCategories = new Map();
-    this.generateHelpEmbed = null;
     this.interactions = new Collection();
     this.safemode = false;
     this.db = {
       GuildSettings: GuildSettingsModel,
     };
   }
+  
   async reloadCommand(commandName: string): Promise<void> {
     try {
       console.log(`Reloading command: ${commandName}`);
@@ -74,6 +74,7 @@ export class ExtendedClient extends Client {
     }
   }
 }
+
 import { CONFIG } from "./config";
 
 const client = new ExtendedClient(CONFIG);
@@ -95,6 +96,7 @@ interface Event {
   once?: boolean;
   execute: (client: Client, ...args: any[]) => void;
 }
+
 client.on("messageCreate", async (message: Message): Promise<void> => {
   try {
     if (message.content.toLowerCase().startsWith(`${BOT_PREFIX}`)) {
@@ -153,6 +155,7 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("[UNHANDLED REJECTION]", reason);
   // Optionally log to a file or notify the owner
 });
+
 process.on("InteractionAlreadyReplied", (reason, promise) => {
   console.error("[INTERACTION REPLIED]", reason);
   // Optionally log to a file or notify the owner
@@ -195,6 +198,7 @@ async function updateStatus(message: string) {
     console.error("Error updating status:", error);
   }
 }
+
 client.login(process.env.TOKEN);
 
 // Export client if necessary
