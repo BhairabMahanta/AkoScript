@@ -538,11 +538,11 @@ playerSchema.statics.findArenaOpponents = function(playerId: string, ratingRange
     
     const minRating = player.arena.rating - ratingRange;
     const maxRating = player.arena.rating + ratingRange;
-    
+      
+    // addlater 'arena.inBattle': false,
     return this.find({
       _id: { $ne: playerId },
       'arena.rating': { $gte: minRating, $lte: maxRating },
-      'arena.inBattle': false,
       'arena.defenseDeck': { $exists: true, $not: { $size: 0 } } // ✅ Check defenseDeck instead
     })
     .sort({ 'arena.rating': -1 })

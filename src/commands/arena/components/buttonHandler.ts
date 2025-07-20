@@ -364,7 +364,7 @@ async function handleDeckSlot(interaction: any, client: ExtendedClient): Promise
   }
 }
 
-// ✅ PLACEHOLDER FUNCTIONS FOR OTHER FEATURES
+
 async function handleOpponentSelection(interaction: any, client: ExtendedClient): Promise<void> {
   try {
     const attackerId = interaction.user.id;
@@ -426,13 +426,13 @@ async function handleOpponentSelection(interaction: any, client: ExtendedClient)
     }
 
     // Check if defender is not in battle
-    if (defenderData.arena.inBattle) {
-      await interaction.followUp({
-        content: '❌ This opponent is currently in another battle!',
-        ephemeral: true
-      });
-      return;
-    }
+    // if (defenderData.arena.inBattle) {
+    //   await interaction.followUp({
+    //     content: '❌ This opponent is currently in another battle!',
+    //     ephemeral: true
+    //   });
+    //   return;
+    // }
 
     // Mark both players as in battle
     await Promise.all([

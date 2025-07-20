@@ -235,9 +235,8 @@ async function generateAttackBarEmoji(atkBar: number): Promise<string> {
   const filledBars = Math.floor(atkBar / 10);
   emptyBars = 10 - filledBars;
 
-  return `[${emoji.repeat(filledBars)}${" ".repeat(emptyBars)}]`;
+  return `[${emoji.repeat(filledBars)}${"□".repeat(emptyBars)}]`;
 }
-
 // Generate HP bar emoji
 async function generateHPBarEmoji(
   currentHP: number,
@@ -247,7 +246,7 @@ async function generateHPBarEmoji(
   let filledBars = Math.floor((currentHP / maxHP) * 17);
   if (currentHP < 0) filledBars = 0;
 
-  return `[${emoji.repeat(filledBars)}${" ".repeat(17 - filledBars)}]`;
+  return `[${emoji.repeat(filledBars)}${"□".repeat(17 - filledBars)}]`;
 }
 
 // MongoDB setup

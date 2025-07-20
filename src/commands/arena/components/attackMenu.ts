@@ -30,11 +30,11 @@ export async function showAttackMenu(interaction: any, client: ExtendedClient): 
 
     const minRating = Math.max(1000, playerData.arena.rating - 100);
     const maxRating = playerData.arena.rating + 100;
-    
+    // addlater'arena.inBattle': false,
     const opponents = await PlayerModal.find({
       _id: { $ne: playerId },
       'arena.rating': { $gte: minRating, $lte: maxRating },
-      'arena.inBattle': false,
+      
       'arena.defenseDeck': { $exists: true, $not: { $size: 0 } }
     })
     .select('name arena.rating arena.rank arena.totalWins arena.totalLosses')

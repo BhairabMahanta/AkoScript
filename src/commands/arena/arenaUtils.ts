@@ -93,7 +93,7 @@ export async function createArenaMenuData(playerId: string) {
         .setLabel('⚔️ BATTLE')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🔥')
-        .setDisabled(playerArenaData.attacksToday >= 30 || playerArenaData.inBattle),
+        .setDisabled(playerArenaData.attacksToday >= 30),
       new ButtonBuilder()
         .setCustomId('arena_defense')
         .setLabel('🛡️ DEFENSE')
