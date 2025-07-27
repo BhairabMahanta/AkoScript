@@ -1,31 +1,64 @@
 // gamelogic/abilitiesFunction.ts
-import {
-  checkResults,
-  updateMovesOnCd,
-  getPlayerMoves,
-  critOrNot,
-} from "../util/glogic.js";
 import { BuffDebuffManager } from "./buffDebuffManager";
-import { BuffDebuffLogic, BuffDetails, DebuffDetails, ExtendedPlayer } from "./buffdebufflogic";
+import { BuffDebuffLogic, StatusEffect, ExtendedPlayer } from "./buffdebufflogic";
 import abilities, { AbilityInterface } from "../../data/abilities";
-import allFamiliars from "../../data/information/allfamiliars.js";
-import { Stats } from "../../data/mongo/playerschema.js";
-import { isArray } from "util";
+
+// Strategy pattern for ability types
+interface AbilityStrategy {
+  execute(
+    user: ExtendedPlayer,
+    targets: ExtendedPlayer | ExtendedPlayer[],
+    allTargets: ExtendedPlayer[],
+    allAllies: ExtendedPlayer[],
+    ability: AbilityInterface
+  ): Promise<void>;
+}
 
 class Ability {
   private battle: any;
   private buffDebuffManager: BuffDebuffManager;
   private buffDebuffLogic: BuffDebuffLogic;
+  private strategies: Map<string, AbilityStrategy>;
 
   constructor(battle: any) {
     this.battle = battle;
     this.buffDebuffManager = new BuffDebuffManager(battle);
     this.buffDebuffLogic = new BuffDebuffLogic(battle);
+    this.strategies = this.initializeStrategies();
   }
 
-  async cooldownFinder(ability: string): Promise<number> {
-    const abilityData = abilities[ability];
-    return abilityData?.cooldown || 0;
+  private initializeStrategies(): Map<string, AbilityStrategy> {
+    const strategies = new Map<string, AbilityStrategy>();
+    
+    // Attack strategies
+    strategies.set("attack", new AttackStrategy(this));
+    strategies.set("attack_many", new AttackManyStrategy(this));
+    
+    // Buff strategies
+    strategies.set("increase_self", new BuffSelfStrategy(this));
+    strategies.set("buff_self", new BuffSelfStrategy(this));
+    strategies.set("buff_many", new BuffManyStrategy(this));
+    strategies.set("increase_hit", new BuffAttackStrategy(this));
+    strategies.set("buff_hit", new BuffAttackStrategy(this));
+    strategies.set("hit_buff", new AttackBuffStrategy(this));
+    
+    // Debuff strategies
+    strategies.set("decrease", new DebuffStrategy(this));
+    strategies.set("debuff", new DebuffStrategy(this));
+    strategies.set("debuff_many", new DebuffManyStrategy(this));
+    strategies.set("decrease_hit", new DebuffAttackStrategy(this));
+    strategies.set("debuff_hit", new DebuffAttackStrategy(this));
+    
+    // Heal strategies
+    strategies.set("heal", new HealStrategy(this));
+    strategies.set("heal_many", new HealManyStrategy(this));
+    strategies.set("heal_hit", new HealAttackStrategy(this));
+
+    return strategies;
+  }
+
+  getCooldown(ability: string): number {
+    return abilities[ability]?.cooldown || 0;
   }
 
   async executeAbility(
@@ -43,59 +76,11 @@ class Ability {
     }
 
     try {
-      // Execute ability based on type
-      switch (ability.type) {
-        case "attack":
-          await this.handleAttack(user, target, ability);
-          break;
-        case "attack_many":
-          await this.handleAttack(user, Array.isArray(target) ? target : allTargets, ability);
-          break;
-        case "increase_self":
-          await this.handleBuff(user, user, ability);
-          break;
-        case "increase_hit":
-          await this.handleBuffAttack(user, target, ability);
-          break;
-        case "decrease":
-          await this.handleDebuff(user, target, ability);
-          break;
-        case "decrease_hit":
-          await this.handleDebuffAttack(user, target, ability);
-          break;
-        case "buff_self":
-          await this.handleBuff(user, user, ability);
-          break;
-        case "buff_many":
-          await this.handleBuff(user, Array.isArray(target) ? target : allAllies, ability);
-          break;
-        case "buff_hit":
-          await this.handleBuffAttack(user, target, ability);
-          break;
-        case "debuff":
-          await this.handleDebuff(user, target, ability);
-          break;
-        case "debuff_many":
-          await this.handleDebuff(user, Array.isArray(target) ? target : allTargets, ability);
-          break;
-        case "debuff_hit":
-          await this.handleDebuffAttack(user, target, ability);
-          break;
-        case "heal":
-          await this.handleHeal(user, target, ability);
-          break;
-        case "heal_many":
-          await this.handleHeal(user, Array.isArray(target) ? target : allAllies, ability);
-          break;
-        case "heal_hit":
-          await this.handleHealAttack(user, target, ability);
-          break;
-        case "hit_buff":
-          await this.handleAttackBuff(user, target, ability);
-          break;
-        default:
-          console.log(`Ability type ${ability.type} is not handled.`);
-          break;
+      const strategy = this.strategies.get(ability.type);
+      if (strategy) {
+        await strategy.execute(user, target, allTargets, allAllies, ability);
+      } else {
+        console.log(`Ability type ${ability.type} is not handled.`);
       }
     } catch (error) {
       console.error(`Error executing ability ${abilityName}:`, error);
@@ -103,28 +88,37 @@ class Ability {
     }
   }
 
-  // Attack ability handler
-  private async handleAttack(
+  // Utility methods accessible by strategies
+  async addCooldown(user: ExtendedPlayer, abilityName: string): Promise<void> {
+    this.battle.stateManager.addCooldown({
+      name: abilityName,
+      characterId: user._id,
+      characterName: user.name,
+      cooldown: this.getCooldown(abilityName),
+    });
+  }
+
+  async performAttack(
     user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
+    targets: ExtendedPlayer | ExtendedPlayer[],
     ability: AbilityInterface
   ): Promise<void> {
-    if (Array.isArray(target)) {
+    if (Array.isArray(targets)) {
       try {
-        const { damageArray, enemyNameArray } = await this.buffDebuffLogic.aoeDamage(user, target, ability);
+        const { damageArray, enemyNameArray } = await this.buffDebuffLogic.aoeDamage(user, targets, ability);
         this.battle.addBattleLog(
           `+ ${user.name} performs ${ability.name}, hitting ${enemyNameArray.join(", ")} for ${damageArray.join(", ")} damage respectively`
         );
       } catch (error) {
         console.error("AOE damage error:", error);
         // Fallback to individual attacks
-        for (const t of target) {
+        for (const target of targets) {
           await this.battle.combatResolver.critOrNotHandler(
             user.stats.critRate,
             user.stats.critDamage,
             user.stats.attack,
-            t.stats.defense,
-            t,
+            target.stats.defense,
+            target,
             150,
             ability.name
           );
@@ -135,299 +129,186 @@ class Ability {
         user.stats.critRate,
         user.stats.critDamage,
         user.stats.attack,
-        target.stats.defense,
-        target,
+        targets.stats.defense,
+        targets,
         150,
         ability.name
       );
     }
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
   }
 
-  // Buff ability handler
-  private async handleBuff(
+  async applyStatusEffect(
     user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
+    targets: ExtendedPlayer | ExtendedPlayer[],
+    ability: AbilityInterface,
+    isBuff: boolean
   ): Promise<void> {
-    if (ability.value_amount) {
-      const buffDetails: BuffDetails = {
-        name: ability.name,
-        type: ability.logicType || 'buff',
-        unique: ability.unique || false,
-        value_amount: ability.value_amount,
-        targets: target,
-        turnLimit: ability.turnLimit || 1,
-        flat: ability.flat || false,
-      };
+    if (!ability.value_amount) return;
 
-      await this.buffDebuffManager.applyBuff(user, target, buffDetails);
+    const statusEffect: StatusEffect = {
+      name: ability.name,
+      type: ability.logicType || (isBuff ? 'buff' : 'debuff'),
+      unique: ability.unique || false,
+      value_amount: ability.value_amount,
+      targets: targets,
+      turnLimit: ability.turnLimit || 1,
+      flat: ability.flat || false,
+    };
 
-      if (
-        buffDetails.type.includes("increase_") ||
-        buffDetails.type.includes("decrease_")
-      ) {
-        await this.buffDebuffLogic.increaseWhat(target, buffDetails);
+    if (isBuff) {
+      await this.buffDebuffManager.applyBuff(user, targets, statusEffect);
+      if (statusEffect.type.includes("increase_") || statusEffect.type.includes("decrease_")) {
+        await this.buffDebuffLogic.increaseWhat(targets, statusEffect);
+      }
+    } else {
+      await this.buffDebuffManager.applyDebuff(user, targets, statusEffect);
+      if (statusEffect.type.includes("apply_") || statusEffect.type.includes("remove_")) {
+        await this.buffDebuffLogic.decreaseWhat(targets, statusEffect);
       }
     }
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
   }
 
-  private async handleBuffAttack(
+  async performHeal(
     user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
-  ): Promise<void> {
-    // Apply buff first
-    if (ability.value_amount) {
-      const buffDetails: BuffDetails = {
-        name: ability.name,
-        type: ability.logicType || 'buff',
-        unique: ability.unique || false,
-        value_amount: ability.value_amount,
-        targets: user,
-        turnLimit: ability.turnLimit || 1,
-        flat: ability.flat || false,
-      };
-
-      await this.buffDebuffManager.applyBuff(user, user, buffDetails);
-
-      if (
-        buffDetails.type.includes("increase_") ||
-        buffDetails.type.includes("decrease_")
-      ) {
-        await this.buffDebuffLogic.increaseWhat(user, buffDetails);
-      }
-    }
-
-    // Then perform attack
-    await this.performAttack(user, target, ability);
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
-  }
-
-  private async handleAttackBuff(
-    user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
-  ): Promise<void> {
-    // Perform attack first
-    await this.performAttack(user, target, ability);
-
-    // Then apply buff
-    if (ability.value_amount) {
-      const buffDetails: BuffDetails = {
-        name: ability.name,
-        type: ability.logicType || 'buff',
-        unique: ability.unique || false,
-        value_amount: ability.value_amount,
-        targets: user,
-        turnLimit: ability.turnLimit || 1,
-        flat: ability.flat || false,
-      };
-      
-      if (
-        buffDetails.type.includes("apply_") ||
-        buffDetails.type.includes("remove_")
-      ) {
-        await this.buffDebuffManager.applyBuff(user, user, buffDetails);
-        await this.buffDebuffLogic.increaseWhat(user, buffDetails);
-      }
-    }
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
-  }
-
-  // Debuff ability handler
-  private async handleDebuff(
-    user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
-  ): Promise<void> {
-    if (ability.value_amount) {
-      const debuffDetails: DebuffDetails = {
-        name: ability.name,
-        type: ability.logicType || 'debuff',
-        unique: ability.unique || false,
-        value_amount: ability.value_amount,
-        targets: target,
-        turnLimit: ability.turnLimit || 1,
-        flat: ability.flat || false,
-      };
-
-      await this.buffDebuffManager.applyDebuff(user, target, debuffDetails);
-
-      if (
-        debuffDetails.type.includes("apply_") ||
-        debuffDetails.type.includes("remove_")
-      ) {
-        await this.buffDebuffLogic.decreaseWhat(target, debuffDetails);
-      }
-    }
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
-  }
-
-  private async handleDebuffAttack(
-    user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
-  ): Promise<void> {
-    // Apply debuff first
-    if (ability.value_amount) {
-      const debuffDetails: DebuffDetails = {
-        name: ability.name,
-        type: ability.logicType || 'debuff',
-        unique: ability.unique || false,
-        value_amount: ability.value_amount,
-        targets: target,
-        turnLimit: ability.turnLimit || 1,
-        flat: ability.flat || false,
-      };
-
-      await this.buffDebuffManager.applyDebuff(user, target, debuffDetails);
-
-      if (
-        debuffDetails.type.includes("increase_") ||
-        debuffDetails.type.includes("decrease_")
-      ) {
-        await this.buffDebuffLogic.decreaseWhat(target, debuffDetails);
-      }
-    }
-
-    // Then perform attack
-    await this.performAttack(user, target, ability);
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
-  }
-
-  // Heal ability handler
-  private async handleHeal(
-    user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
+    targets: ExtendedPlayer | ExtendedPlayer[],
     ability: AbilityInterface
   ): Promise<void> {
     const healAmount = ability.value_amount && typeof ability.value_amount === 'object' 
       ? (ability.value_amount as any)["heal"] || 0 
       : 0;
     
-    if (Array.isArray(target)) {
-      for (const t of target) {
-        const currentHp = typeof t.stats.hp === 'number' ? t.stats.hp : 0;
-        const maxHp = t.maxHp || currentHp;
-        t.stats.hp = Math.min(currentHp + healAmount, maxHp);
-      }
-      this.battle.addBattleLog(
-        `${user.name} heals ${target.map(t => t.name).join(", ")} with ${ability.name}, restoring ${healAmount} HP each.`
-      );
-    } else {
+    const targetArray = Array.isArray(targets) ? targets : [targets];
+    
+    for (const target of targetArray) {
       const currentHp = typeof target.stats.hp === 'number' ? target.stats.hp : 0;
       const maxHp = target.maxHp || currentHp;
       target.stats.hp = Math.min(currentHp + healAmount, maxHp);
-      this.battle.addBattleLog(
-        `${user.name} heals ${target.name} with ${ability.name}, restoring ${healAmount} HP.`
-      );
     }
 
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
-  }
-
-  private async handleHealAttack(
-    user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
-  ): Promise<void> {
-    // Perform attack first
-    await this.performAttack(user, target, ability);
-
-    // Then heal user
-    const healAmount = ability.value_amount && typeof ability.value_amount === 'object' 
-      ? (ability.value_amount as any)["heal"] || 0 
-      : 0;
-      
-    const currentHp = typeof user.stats.hp === 'number' ? user.stats.hp : 0;
-    const maxHp = user.maxHp || currentHp;
-    user.stats.hp = Math.min(currentHp + healAmount, maxHp);
-    
     this.battle.addBattleLog(
-      `${user.name} heals themselves with ${ability.name}, restoring ${healAmount} HP.`
+      `${user.name} heals ${targetArray.map(t => t.name).join(", ")} with ${ability.name}, restoring ${healAmount} HP${targetArray.length > 1 ? ' each' : ''}.`
     );
-
-    // Add cooldown
-    this.battle.stateManager.addCooldown({
-      name: ability.name,
-      cooldown: await this.cooldownFinder(ability.name),
-    });
   }
 
-  // Helper method to perform attack
-  private async performAttack(
-    user: ExtendedPlayer,
-    target: ExtendedPlayer | ExtendedPlayer[],
-    ability: AbilityInterface
-  ): Promise<void> {
-    if (Array.isArray(target)) {
-      try {
-        const { damageArray, enemyNameArray } = await this.buffDebuffLogic.aoeDamage(user, target, ability);
-        this.battle.addBattleLog(
-          `+ ${user.name} performs ${ability.name}, hitting ${enemyNameArray.join(", ")} for ${damageArray.join(", ")} damage respectively`
-        );
-      } catch (error) {
-        console.error("AOE damage error:", error);
-        // Fallback to individual attacks
-        for (const t of target) {
-          await this.battle.combatResolver.critOrNotHandler(
-            user.stats.critRate,
-            user.stats.critDamage,
-            user.stats.attack,
-            t.stats.defense,
-            t,
-            150,
-            ability.name
-          );
-        }
-      }
-    } else {
-      await this.battle.combatResolver.critOrNotHandler(
-        user.stats.critRate,
-        user.stats.critDamage,
-        user.stats.attack,
-        target.stats.defense,
-        target,
-        150,
-        ability.name
-      );
-    }
+  // Getters for strategies to access private members
+  get manager() { return this.buffDebuffManager; }
+  get logic() { return this.buffDebuffLogic; }
+}
+
+// Strategy implementations
+class AttackStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.performAttack(user, targets, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class AttackManyStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    const actualTargets = Array.isArray(targets) ? targets : allTargets;
+    await this.ability.performAttack(user, actualTargets, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class BuffSelfStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.applyStatusEffect(user, user, abilityData, true);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class BuffManyStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    const actualTargets = Array.isArray(targets) ? targets : allAllies;
+    await this.ability.applyStatusEffect(user, actualTargets, abilityData, true);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class BuffAttackStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.applyStatusEffect(user, user, abilityData, true);
+    await this.ability.performAttack(user, targets, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class AttackBuffStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.performAttack(user, targets, abilityData);
+    await this.ability.applyStatusEffect(user, user, abilityData, true);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class DebuffStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.applyStatusEffect(user, targets, abilityData, false);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class DebuffManyStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    const actualTargets = Array.isArray(targets) ? targets : allTargets;
+    await this.ability.applyStatusEffect(user, actualTargets, abilityData, false);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class DebuffAttackStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.applyStatusEffect(user, targets, abilityData, false);
+    await this.ability.performAttack(user, targets, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class HealStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.performHeal(user, targets, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class HealManyStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    const actualTargets = Array.isArray(targets) ? targets : allAllies;
+    await this.ability.performHeal(user, actualTargets, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
+  }
+}
+
+class HealAttackStrategy implements AbilityStrategy {
+  constructor(private ability: Ability) {}
+
+  async execute(user: ExtendedPlayer, targets: ExtendedPlayer | ExtendedPlayer[], allTargets: ExtendedPlayer[], allAllies: ExtendedPlayer[], abilityData: AbilityInterface): Promise<void> {
+    await this.ability.performAttack(user, targets, abilityData);
+    await this.ability.performHeal(user, user, abilityData);
+    await this.ability.addCooldown(user, abilityData.name);
   }
 }
 

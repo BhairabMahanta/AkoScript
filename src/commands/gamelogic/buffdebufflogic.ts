@@ -1,17 +1,10 @@
 // gamelogic/buffdebufflogic.ts
 import { Player, Stats } from "../../data/mongo/playerschema";
-import { critOrNot } from "../util/glogic";
-
-interface Buff {
-  name: string;
-  description: string;
-  effect: string;
-}
 
 export interface ExtendedPlayer extends Player {
   statuses: {
-    buffs: BuffDetails[];
-    debuffs: DebuffDetails[];
+    buffs: StatusEffect[];
+    debuffs: StatusEffect[];
   };
   attackBarEmoji?: string;
   hpBar: number;
@@ -22,74 +15,47 @@ export interface ExtendedPlayer extends Player {
   isNPC?: boolean;
 }
 
+// Unified interface for both buffs and debuffs
+export interface StatusEffect {
+  type: string;
+  name: string;
+  value_amount: {
+    attack?: number;
+    speed?: number;
+    defense?: number;
+    heal?: number;
+  };
+  flat?: boolean;
+  unique?: boolean;
+  turnLimit: number;
+  targets: ExtendedPlayer | ExtendedPlayer[];
+}
+
+// Deprecated - keeping for backward compatibility
+export interface BuffDetails extends StatusEffect {}
+export interface DebuffDetails extends StatusEffect {}
+
+interface Buff {
+  name: string;
+  description: string;
+  effect: string;
+}
+
 export const buffs: Record<string, Buff> = {
-  "Attack Boost": {
-    name: "Attack Boost",
-    description: "Boosts your attack power.",
-    effect: "increase_attack",
-  },
-  "Defense Boost": {
-    name: "Defense Boost",
-    description: "Boosts your defense power.",
-    effect: "increase_defense",
-  },
-  "Speed Boost": {
-    name: "Speed Boost",
-    description: "Boosts your speed.",
-    effect: "increase_speed",
-  },
+  "Attack Boost": { name: "Attack Boost", description: "Boosts your attack power.", effect: "increase_attack" },
+  "Defense Boost": { name: "Defense Boost", description: "Boosts your defense power.", effect: "increase_defense" },
+  "Speed Boost": { name: "Speed Boost", description: "Boosts your speed.", effect: "increase_speed" },
 };
 
 export const debuffs: Record<string, Buff> = {
-  "Attack Break": {
-    name: "Attack Break",
-    description: "Reduces your attack power.",
-    effect: "decrease_attack",
-  },
-  "Defense Break": {
-    name: "Defense Break",
-    description: "Reduces your defense power.",
-    effect: "decrease_defense",
-  },
-  Slow: {
-    name: "Slow",
-    description: "Reduces your speed.",
-    effect: "decrease_speed",
-  },
-  Stun: {
-    name: "Stun",
-    description: "Stuns you, preventing any action.",
-    effect: "stun",
-  },
+  "Attack Break": { name: "Attack Break", description: "Reduces your attack power.", effect: "decrease_attack" },
+  "Defense Break": { name: "Defense Break", description: "Reduces your defense power.", effect: "decrease_defense" },
+  "Slow": { name: "Slow", description: "Reduces your speed.", effect: "decrease_speed" },
+  "Stun": { name: "Stun", description: "Stuns you, preventing any action.", effect: "stun" },
 };
 
-export interface BuffDetails {
-  type: string;
-  name: string;
-  value_amount: {
-    attack?: number;
-    speed?: number;
-    defense?: number;
-  };
-  flat?: boolean;
-  unique?: boolean;
-  turnLimit: number;
-  targets: ExtendedPlayer | ExtendedPlayer[];
-}
-
-export interface DebuffDetails {
-  type: string;
-  name: string;
-  value_amount: {
-    attack?: number;
-    speed?: number;
-    defense?: number;
-  };
-  flat?: boolean;
-  unique?: boolean;
-  turnLimit: number;
-  targets: ExtendedPlayer | ExtendedPlayer[];
-}
+type StatType = 'attack' | 'speed' | 'defense';
+type SpecialEffectType = 'immunity' | 'stun' | 'invincibility' | 'freeze' | 'invisibility' | 'block_buffs' | 'cleanse';
 
 class BuffDebuffLogic {
   private battle: any;
@@ -98,334 +64,224 @@ class BuffDebuffLogic {
     this.battle = battle;
   }
 
-  async overLogic(
-    turnEnder: ExtendedPlayer,
-    buff: any,
-    i: number,
-    what: boolean
-  ): Promise<void> {
-    let types: any;
-    if (buff.type.includes("_and_")) types = buff.type.split("_and_");
-    else types = [buff.type];
-    
-    types.forEach((type: string) => {
-      if (type.startsWith("increase_") || type.startsWith("decrease_")) {
-        const attribute = type.split("_")[1];
-        console.log("type:", type);
-        if (buff.flat) {
-          turnEnder.stats[attribute as keyof Stats] -= buff.value_amount[attribute];
-        } else {
-          turnEnder.stats[attribute as keyof Stats] -=
-            (turnEnder.stats[attribute as keyof Stats] *
-              (buff.value_amount as unknown as number)) / 100;
-        }
-      }
-    });
-
-    console.log("what:", what);
-    if (what === true) {
-      turnEnder.statuses.debuffs.splice(i, 1); // Remove debuff
+  // Unified method to modify stats (replaces 6 separate methods)
+  private modifyStat(target: Player, stat: StatType, amount: number, flat: boolean, increase: boolean): void {
+    const multiplier = increase ? 1 : -1;
+    if (flat) {
+      target.stats[stat] += amount * multiplier;
     } else {
-      turnEnder.statuses.buffs.splice(i, 1); // Remove buff
+      target.stats[stat] += (target.stats[stat] * amount * multiplier) / 100;
     }
   }
 
-  // Example for increasing/decreasing various stats
-  async increaseAttack(target: Player, amount: number, flat: boolean): Promise<void> {
-    target.stats.attack += flat ? amount : target.stats.attack * (amount / 100);
+  // Unified method for applying special effects
+  private async applySpecialEffect(target: Player, effect: SpecialEffectType, turns: number): Promise<void> {
+    // Placeholder implementations - extend as needed
+    switch (effect) {
+      case 'immunity':
+      case 'stun':
+      case 'invincibility':
+      case 'freeze':
+      case 'invisibility':
+      case 'block_buffs':
+        // Implementation would go here
+        break;
+      case 'cleanse':
+        // Implementation would go here
+        break;
+    }
   }
 
-  async decreaseAttack(target: Player, amount: number, flat: boolean): Promise<void> {
-    target.stats.attack -= flat ? amount : target.stats.attack * (amount / 100);
-  }
+  // Optimized AOE damage calculation
+  async aoeDamage(user: Player, targets: Player[], ability: any): Promise<{ damageArray: number[]; enemyNameArray: string[] }> {
+    const damageArray: number[] = [];
+    const enemyNameArray: string[] = [];
+    const power = ability.power || 150;
 
-  async increaseSpeed(target: Player, amount: number, flat: boolean): Promise<void> {
-    target.stats.speed += flat ? amount : target.stats.speed * (amount / 100);
-  }
-
-  async decreaseSpeed(target: Player, amount: number, flat: boolean): Promise<void> {
-    target.stats.speed -= flat ? amount : target.stats.speed * (amount / 100);
-  }
-
-  async increaseDefense(target: Player, amount: number, flat: boolean): Promise<void> {
-    target.stats.defense += flat ? amount : target.stats.defense * (amount / 100);
-  }
-
-  async decreaseDefense(target: Player, amount: number, flat: boolean): Promise<void> {
-    target.stats.defense -= flat ? amount : target.stats.defense * (amount / 100);
-  }
-
-  // Placeholder functions for debuff effects
-  async immunity(target: Player, turns: number): Promise<void> {}
-  async stun(target: Player, turns: number): Promise<void> {}
-  async invincibility(target: Player, turns: number): Promise<void> {}
-  async freeze(target: Player, turns: number): Promise<void> {}
-  async invisibility(target: Player, turns: number): Promise<void> {}
-  async blockBuffs(target: Player, turns: number): Promise<void> {}
-  async cleanse(target: Player): Promise<void> {}
-
-  async aoeDamage(user: Player, targets: Player[], thang: any): Promise<{ damageArray: number[]; enemyNameArray: string[] }> {
-    let damageArray: number[] = [];
-    let enemyNameArray: string[] = [];
-
-    await Promise.all(
+    // Process all targets in parallel for better performance
+    const results = await Promise.all(
       targets.map(async (target) => {
-        // Use the refactored battle system's combat resolver
         const damage = await this.battle.combatResolver.critOrNotHandler(
           user.stats.critRate,
           user.stats.critDamage,
           user.stats.attack,
           target.stats.defense,
           target,
-          thang.power || 150,
-          thang.name
+          power,
+          ability.name
         );
-        damageArray.push(damage / targets.length);
-        enemyNameArray.push(target.name);
+        return { damage, name: target.name };
       })
     );
+
+    results.forEach(result => {
+      damageArray.push(result.damage);
+      enemyNameArray.push(result.name);
+    });
 
     return { damageArray, enemyNameArray };
   }
 
-  async applyWhat(
-    target: Player | Player[],
-    debuffDetails: {
-      type: string;
-      flat?: boolean;
-      turnLimit: number;
-      name: string;
-    }
-  ): Promise<void> {
-    const debuffTypes = debuffDetails.type.split("_and_");
-    let targetNames: string[] = [];
+  // Unified method for processing status effects
+  async processStatusEffect(
+    targets: ExtendedPlayer | ExtendedPlayer[], 
+    effect: StatusEffect, 
+    isIncrease: boolean = true
+  ): Promise<string[]> {
+    const targetArray = Array.isArray(targets) ? targets : [targets];
+    const effectTypes = effect.type.split("_and_");
+    const targetNames: string[] = [];
+    const statChanges: string[] = [];
 
-    for (const unit of Array.isArray(target) ? target : [target]) {
-      for (const debuffType of debuffTypes) {
-        const flat = debuffDetails.flat || false;
-
-        switch (debuffType) {
-          case "apply_immunity":
-            await this.immunity(unit, debuffDetails.turnLimit);
-            break;
-          case "apply_stun":
-            await this.stun(unit, debuffDetails.turnLimit);
-            break;
-          case "apply_invincibility":
-            await this.invincibility(unit, debuffDetails.turnLimit);
-            break;
-          case "apply_freeze":
-            await this.freeze(unit, debuffDetails.turnLimit);
-            break;
-          case "apply_invisibility":
-            await this.invisibility(unit, debuffDetails.turnLimit);
-            break;
-          case "apply_block_buffs":
-            await this.blockBuffs(unit, debuffDetails.turnLimit);
-            break;
-          case "apply_cleanse":
-            await this.cleanse(unit);
-            break;
-          default:
-            throw new Error(`Unknown debuff type: ${debuffType}`);
+    for (const target of targetArray) {
+      for (const effectType of effectTypes) {
+        const flat = effect.flat || false;
+        
+        if (effectType.startsWith("apply_")) {
+          const specialEffect = effectType.replace("apply_", "") as SpecialEffectType;
+          await this.applySpecialEffect(target, specialEffect, effect.turnLimit);
+        } else if (effectType.includes("_")) {
+          const [action, stat] = effectType.split("_");
+          const shouldIncrease = action === "increase";
+          const amount = effect.value_amount[stat as StatType] || 0;
+          
+          if (stat in target.stats) {
+            this.modifyStat(target, stat as StatType, amount, flat, shouldIncrease);
+            statChanges.push(`${stat} by ${amount}${flat ? "" : "%"}`);
+          }
         }
       }
-      targetNames.push(unit.name);
+      targetNames.push(target.name);
     }
+
+    return targetNames;
+  }
+
+  // Simplified increase method
+  async increaseWhat(targets: ExtendedPlayer | ExtendedPlayer[], effect: StatusEffect): Promise<void> {
+    const targetNames = await this.processStatusEffect(targets, effect, true);
+    const statChanges = this.getStatChangesDescription(effect);
     
-    const logMessage = `${targetNames.join(", ")} received ${debuffDetails.name} debuff.`;
-    this.battle.addBattleLog(logMessage);
+    this.battle.addBattleLog(
+      `${targetNames.join(", ")} received ${effect.name} buff${statChanges ? `, increasing ${statChanges}` : ""}.`
+    );
   }
 
-  async increaseWhat(target: Player | Player[], buffDetails: BuffDetails): Promise<void> {
-    const buffs = buffDetails.type.split("_and_");
-    let derArray: string[] = [];
-    let statChanges: string[] = [];
+  // Simplified decrease method
+  async decreaseWhat(targets: ExtendedPlayer | ExtendedPlayer[], effect: StatusEffect): Promise<void> {
+    const targetNames = await this.processStatusEffect(targets, effect, false);
+    const statChanges = this.getStatChangesDescription(effect);
+    
+    this.battle.addBattleLog(
+      `${targetNames.join(", ")} received ${effect.name} debuff${statChanges ? `, decreasing ${statChanges}` : ""}.`
+    );
+  }
 
-    for (const unit of Array.isArray(target) ? target : [target]) {
-      for (const buffType of buffs) {
-        const flat = buffDetails.flat || false;
-
-        switch (buffType) {
-          case "increase_attack":
-            await this.increaseAttack(
-              unit,
-              buffDetails.value_amount.attack || 0,
-              flat
-            );
-            statChanges.push(
-              `attack by ${buffDetails.value_amount.attack}${flat ? "" : "%"}`
-            );
-            break;
-          case "increase_speed":
-            await this.increaseSpeed(
-              unit,
-              buffDetails.value_amount.speed || 0,
-              flat
-            );
-            statChanges.push(
-              `speed by ${buffDetails.value_amount.speed}${flat ? "" : "%"}`
-            );
-            break;
-          case "increase_defense":
-            await this.increaseDefense(
-              unit,
-              buffDetails.value_amount.defense || 0,
-              flat
-            );
-            statChanges.push(
-              `defense by ${buffDetails.value_amount.defense}${flat ? "" : "%"}`
-            );
-            break;
-          case "decrease_attack":
-            await this.decreaseAttack(
-              unit,
-              buffDetails.value_amount.attack || 0,
-              flat
-            );
-            break;
-          case "decrease_speed":
-            await this.decreaseSpeed(
-              unit,
-              buffDetails.value_amount.speed || 0,
-              flat
-            );
-            break;
-          case "decrease_defense":
-            await this.decreaseDefense(
-              unit,
-              buffDetails.value_amount.defense || 0,
-              flat
-            );
-            break;
-          default:
-            throw new Error(`Unknown buff type: ${buffType}`);
-        }
+  // Helper method to generate stat change descriptions
+  private getStatChangesDescription(effect: StatusEffect): string {
+    const changes: string[] = [];
+    const flat = effect.flat || false;
+    
+    Object.entries(effect.value_amount).forEach(([stat, amount]) => {
+      if (amount && stat !== 'heal') {
+        changes.push(`${stat} by ${amount}${flat ? "" : "%"}`);
       }
-      derArray.push(unit.name);
-    }
-
-    const logMessage = `${derArray.join(", ")} received ${buffDetails.name} buff, increasing ${statChanges.join(" and ")}.`;
-    this.battle.addBattleLog(logMessage);
+    });
+    
+    return changes.join(" and ");
   }
 
-  async decreaseWhat(
-    target: ExtendedPlayer | ExtendedPlayer[],
-    debuffDetails: DebuffDetails
+  // Simplified apply method for special effects
+  async applyWhat(targets: ExtendedPlayer | ExtendedPlayer[], effect: StatusEffect): Promise<void> {
+    const targetNames = await this.processStatusEffect(targets, effect);
+    this.battle.addBattleLog(`${targetNames.join(", ")} received ${effect.name} effect.`);
+  }
+
+  // Optimized overLogic method
+  async processStatusRemoval(
+    player: ExtendedPlayer,
+    statusEffect: StatusEffect,
+    index: number,
+    isDebuff: boolean
   ): Promise<void> {
-    const debuffs = debuffDetails.type.split("_and_");
-    let derArray: string[] = [];
-    let statChanges: string[] = [];
-
-    for (const unit of Array.isArray(target) ? target : [target]) {
-      for (const debuffType of debuffs) {
-        const flat = debuffDetails.flat || false;
-
-        switch (debuffType) {
-          case "decrease_attack":
-            await this.decreaseAttack(
-              unit,
-              debuffDetails.value_amount.attack || 0,
-              flat
-            );
-            statChanges.push(
-              `attack by ${debuffDetails.value_amount.attack}${flat ? "" : "%"}`
-            );
-            break;
-          case "decrease_speed":
-            await this.decreaseSpeed(
-              unit,
-              debuffDetails.value_amount.speed || 0,
-              flat
-            );
-            statChanges.push(
-              `speed by ${debuffDetails.value_amount.speed}${flat ? "" : "%"}`
-            );
-            break;
-          case "decrease_defense":
-            await this.decreaseDefense(
-              unit,
-              debuffDetails.value_amount.defense || 0,
-              flat
-            );
-            statChanges.push(
-              `defense by ${debuffDetails.value_amount.defense}${flat ? "" : "%"}`
-            );
-            break;
-          default:
-            throw new Error(`Unknown debuff type: ${debuffType}`);
+    const effectTypes = statusEffect.type.split("_and_");
+    
+    effectTypes.forEach((type: string) => {
+      if (type.startsWith("increase_") || type.startsWith("decrease_")) {
+        const [action, attribute] = type.split("_");
+        const amount = statusEffect.value_amount[attribute as StatType] || 0;
+        const shouldReverse = action === "increase";
+        
+        if (attribute in player.stats) {
+          this.modifyStat(player, attribute as StatType, amount, statusEffect.flat || false, !shouldReverse);
         }
       }
-      derArray.push(unit.name);
-    }
+    });
 
-    const logMessage = `${derArray.join(", ")} received ${debuffDetails.name} debuff, decreasing ${statChanges.join(" and ")}.`;
-    this.battle.addBattleLog(logMessage);
-  }
-
-  async increaseAttackNSpeed(
-    target: ExtendedPlayer | ExtendedPlayer[],
-    buffDetails: BuffDetails
-  ): Promise<void> {
-    const targetArray = Array.isArray(buffDetails.targets)
-      ? buffDetails.targets
-      : [buffDetails.targets];
-
-    if (buffDetails.unique === true && targetArray.length > 1) {
-      let derArray: string[] = [];
-      let buff: any;
-
-      for (const unit of Array.isArray(target) ? target : [target]) {
-        buff = {
-          type: "increase_attack_and_speed",
-          name: buffDetails.name,
-          remainingTurns: buffDetails.turnLimit,
-          attack_amount: buffDetails.value_amount.attack,
-          speed_amount: buffDetails.value_amount.speed,
-          flat: buffDetails.flat || false,
-        };
-
-        if (buff.flat) {
-          unit.stats.attack += buff.attack_amount || 0;
-          unit.stats.speed += buff.speed_amount || 0;
-        } else {
-          unit.stats.attack += unit.stats.attack * ((buff.attack_amount || 0) / 100);
-          unit.stats.speed += unit.stats.speed * ((buff.speed_amount || 0) / 100);
-        }
-        derArray.push(unit.name);
-      }
-
-      this.battle.addBattleLog(
-        ` ${derArray.join(", ")} received ${buffDetails.name} buff, increasing attack by ${buff.attack_amount}${
-          buff.flat ? "" : "%"
-        } and speed by ${buff.speed_amount}${buff.flat ? "" : "%"}.`
-      );
+    // Remove the status effect
+    if (isDebuff) {
+      player.statuses.debuffs.splice(index, 1);
     } else {
-      const buff = {
-        type: "increase_attack_and_speed",
-        name: buffDetails.name,
-        remainingTurns: buffDetails.turnLimit,
-        attack_amount: buffDetails.value_amount.attack,
-        speed_amount: buffDetails.value_amount.speed,
-        flat: buffDetails.flat || false,
-      };
-
-      if (buff.flat) {
-        (target as Player).stats.attack += buff.attack_amount || 0;
-        (target as Player).stats.speed += buff.speed_amount || 0;
-      } else {
-        (target as Player).stats.attack +=
-          (target as Player).stats.attack * ((buff.attack_amount || 0) / 100);
-        (target as Player).stats.speed +=
-          (target as Player).stats.speed * ((buff.speed_amount || 0) / 100);
-      }
-
-      this.battle.addBattleLog(
-        `${(target as Player).name} received ${buffDetails.name} buff, increasing attack by ${buff.attack_amount}${
-          buff.flat ? "" : "%"
-        } and speed by ${buff.speed_amount}${buff.flat ? "" : "%"}.`
-      );
+      player.statuses.buffs.splice(index, 1);
     }
+  }
+
+  // Legacy method for backward compatibility
+  async overLogic(turnEnder: ExtendedPlayer, effect: any, index: number, isDebuff: boolean): Promise<void> {
+    await this.processStatusRemoval(turnEnder, effect, index, isDebuff);
+  }
+
+  // Legacy methods for backward compatibility - now using unified logic
+  async increaseAttack(target: Player, amount: number, flat: boolean): Promise<void> {
+    this.modifyStat(target, 'attack', amount, flat, true);
+  }
+
+  async decreaseAttack(target: Player, amount: number, flat: boolean): Promise<void> {
+    this.modifyStat(target, 'attack', amount, flat, false);
+  }
+
+  async increaseSpeed(target: Player, amount: number, flat: boolean): Promise<void> {
+    this.modifyStat(target, 'speed', amount, flat, true);
+  }
+
+  async decreaseSpeed(target: Player, amount: number, flat: boolean): Promise<void> {
+    this.modifyStat(target, 'speed', amount, flat, false);
+  }
+
+  async increaseDefense(target: Player, amount: number, flat: boolean): Promise<void> {
+    this.modifyStat(target, 'defense', amount, flat, true);
+  }
+
+  async decreaseDefense(target: Player, amount: number, flat: boolean): Promise<void> {
+    this.modifyStat(target, 'defense', amount, flat, false);
+  }
+
+  // Legacy special effect methods
+  async immunity(target: Player, turns: number): Promise<void> {
+    await this.applySpecialEffect(target, 'immunity', turns);
+  }
+  async stun(target: Player, turns: number): Promise<void> {
+    await this.applySpecialEffect(target, 'stun', turns);
+  }
+  async invincibility(target: Player, turns: number): Promise<void> {
+    await this.applySpecialEffect(target, 'invincibility', turns);
+  }
+  async freeze(target: Player, turns: number): Promise<void> {
+    await this.applySpecialEffect(target, 'freeze', turns);
+  }
+  async invisibility(target: Player, turns: number): Promise<void> {
+    await this.applySpecialEffect(target, 'invisibility', turns);
+  }
+  async blockBuffs(target: Player, turns: number): Promise<void> {
+    await this.applySpecialEffect(target, 'block_buffs', turns);
+  }
+  async cleanse(target: Player): Promise<void> {
+    await this.applySpecialEffect(target, 'cleanse', 0);
+  }
+
+  // Legacy method - simplified
+  async increaseAttackNSpeed(targets: ExtendedPlayer | ExtendedPlayer[], effect: StatusEffect): Promise<void> {
+    await this.increaseWhat(targets, effect);
   }
 }
 

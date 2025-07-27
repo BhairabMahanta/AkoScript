@@ -1,3 +1,4 @@
+// index.ts - CLEAN VERSION
 import * as dotenv from "dotenv";
 dotenv.config();
 import {
@@ -23,11 +24,12 @@ import {
   CommandHandler,
   GuildSettingsModel,
 } from "./events/handlers/commandHandler";
-// import { loadCommands } from "./handler.js";
 import path from "path";
 import fs from "fs";
 import { MongoClient } from "mongodb";
 import { Command } from "./events/handlers/commandHandler";
+// ONLY IMPORT APIMonitor
+import { APIMonitor } from "./monitoring/APIMonitor";
 
 export class ExtendedClient extends Client {
   config: BotConfig;
@@ -38,6 +40,9 @@ export class ExtendedClient extends Client {
   db: {
     GuildSettings: typeof GuildSettingsModel;
   };
+  
+  // ONLY API monitoring - no battle tracker
+  apiMonitor: APIMonitor;
 
   constructor(config: BotConfig) {
     super({
@@ -51,7 +56,7 @@ export class ExtendedClient extends Client {
       ],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
       rest: {
-        timeout: 30000, // 30 seconds timeout
+        timeout: 30000,
       },
     });
 
@@ -63,12 +68,38 @@ export class ExtendedClient extends Client {
     this.db = {
       GuildSettings: GuildSettingsModel,
     };
+    
+    // ONLY initialize basic API monitoring
+    this.apiMonitor = new APIMonitor();
+    this.setupAPIMonitoring();
   }
+
+private setupAPIMonitoring(): void {
+  // Monitor rate limits
+  this.rest.on('rateLimited', (rateLimitData) => {
+    console.warn(`🚨 Rate Limited - Route: ${rateLimitData.route}`);
+    this.apiMonitor.trackRateLimit(rateLimitData);
+  });
+
+  // Monitor API responses with enhanced header parsing
+  this.rest.on('response', (request, response) => {
+    const rateLimitHeaders = {
+      limit: response.headers.get('x-ratelimit-limit'),
+      remaining: response.headers.get('x-ratelimit-remaining'),
+      resetAfter: response.headers.get('x-ratelimit-reset-after'),
+      bucket: response.headers.get('x-ratelimit-bucket'),
+      global: response.headers.get('x-ratelimit-global') === 'true',
+      scope: response.headers.get('x-ratelimit-scope')
+    };
+    
+    // Pass headers to tracking
+    this.apiMonitor.trackAPICall(request.method, request.path, rateLimitHeaders);
+  });
+}
   
   async reloadCommand(commandName: string): Promise<void> {
     try {
       console.log(`Reloading command: ${commandName}`);
-      // Add your reload command logic here
     } catch (error) {
       console.error(`Failed to reload command ${commandName}:`, error);
     }
@@ -83,19 +114,13 @@ const BOT_PREFIX = "a!";
 const commandHandler = new CommandHandler(client, CONFIG);
 commandHandler.loadCommands();
 
-// Interaction handler
+// Keep your existing interaction handler import
 import interactionHandler from "./events/handlers/interactionHandler";
 import { checkQuestCompletion } from "./commands/util/glogic";
 import { SlashCommand } from "./@types/command";
 import { SlashCommandHandler } from "./events/handlers/SlashCommandHandler";
 
 client.on(Events.InteractionCreate, interactionHandler);
-
-interface Event {
-  name: string;
-  once?: boolean;
-  execute: (client: Client, ...args: any[]) => void;
-}
 
 client.on("messageCreate", async (message: Message): Promise<void> => {
   try {
@@ -104,25 +129,51 @@ client.on("messageCreate", async (message: Message): Promise<void> => {
       const commandName: string | undefined = args.shift()?.toLowerCase();
 
       console.log(`Received command: ${commandName}`);
-
-      commandHandler.handleCommand(message);
+      
+      // Simple command tracking
+      const startTime = Date.now();
+      await commandHandler.handleCommand(message);
+      const executionTime = Date.now() - startTime;
+      
+      // Log basic command metrics
+      await logCommandUsage(commandName, message.guildId, executionTime, message.author.id);
     }
   } catch (error) {
     console.log("Error handling command:", error);
   }
 });
 
-// Fix for loading events with args
+async function logCommandUsage(
+  commandName: string | undefined, 
+  guildId: string | null, 
+  executionTime: number,
+  userId: string
+): Promise<void> {
+  try {
+    const db = mongoClient.db("Akaimnky");
+    const collection = db.collection('command_usage');
+    
+    await collection.insertOne({
+      command: commandName,
+      guildId,
+      userId,
+      executionTime,
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    console.error('Failed to log command usage:', error);
+  }
+}
+
+// Rest of your existing code stays the same...
 const eventsPath = path.join(__dirname, "events");
 const eventFiles: string[] = fs
   .readdirSync(eventsPath)
   .filter((file) => file.endsWith(".js") || file.endsWith(".ts"));
 
 for (const file of eventFiles) {
-  const event: Event = require(path.join(eventsPath, file));
+  const event: any = require(path.join(eventsPath, file));
   const eventMethod = event.once ? "once" : "on";
-
-  // Ensure proper typing for spreading the arguments and passing the client
   client[eventMethod](event.name, (...args: any[]) =>
     event.execute(client, ...args)
   );
@@ -130,13 +181,30 @@ for (const file of eventFiles) {
 
 client.on("ready", async () => {
   console.log(`${client.user?.tag} is ready! 🚀`);
-  const db = await connectToDB(); // Connect to MongoDB when the bot is ready
-    // 👇 ADD THIS
-    const slashHandler = new SlashCommandHandler(client);
-    await slashHandler.loadSlashCommands();
+  const db = await connectToDB();
+  const slashHandler = new SlashCommandHandler(client);
+  await slashHandler.loadSlashCommands();
   updateStatus("Akai is breaking stuff again.");
+  
+  // Detailed monitoring reports every 2 minutes
+  setInterval(() => {
+    client.apiMonitor.printDetailedStats();
+  }, 120000); // Every 2 minutes
+  
+  // Quick status every 30 seconds
+  setInterval(() => {
+    const metrics = client.apiMonitor.getMetrics();
+    console.log(`🚀 Quick Stats: ${metrics.callsLast60Seconds} calls/60s | ${metrics.globalCallsPerSecond.toFixed(1)} RPS | ${metrics.rateLimitHits} rate limits`);
+  }, 30000); // Every 30 seconds
+  
+  // Reset daily to prevent memory buildup
+  setInterval(() => {
+    console.log("🔄 Daily API monitoring reset");
+    client.apiMonitor.reset();
+  }, 24 * 60 * 60 * 1000); // Every 24 hours
 });
 
+// All your existing functions stay the same...
 setInterval(checkQuestCompletion, 10000 * 60);
 
 process.on("SIGINT", () => {
@@ -153,12 +221,6 @@ process.on("uncaughtException", async (err) => {
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[UNHANDLED REJECTION]", reason);
-  // Optionally log to a file or notify the owner
-});
-
-process.on("InteractionAlreadyReplied", (reason, promise) => {
-  console.error("[INTERACTION REPLIED]", reason);
-  // Optionally log to a file or notify the owner
 });
 
 client.on(Events.GuildCreate, () => updateStatus("Bot joined a new server."));
@@ -201,5 +263,4 @@ async function updateStatus(message: string) {
 
 client.login(process.env.TOKEN);
 
-// Export client if necessary
 export { client };

@@ -1,4 +1,4 @@
-// ui/interactions/handlers/ActionHandlers.ts
+// ui/interactions/handlers/ActionHandlers.ts - COMPLETE VERSION
 import { cycleCooldowns } from '../../../../../../util/glogic';
 import { CharacterIdentifier } from "../../managers/CharacterIdentifier";
 import { TargetManager } from '../../managers/TargetManager';
@@ -15,6 +15,8 @@ export class ActionHandlers {
   }
 
   async handleBasicAttack(i: any): Promise<void> {
+    console.log(`\x1b[36m[ActionHandlers]\x1b[0m handleBasicAttack called by ${i.user.username}`);
+    
     const state = this.battle.stateManager.getState();
     const currentPlayerId = this.characterIdentifier.getCurrentPlayerIdFromUserId(i.user.id);
     
@@ -31,11 +33,21 @@ export class ActionHandlers {
     
     if (!await this.validateTarget(i, target, currentPlayerId)) return;
 
+    console.log(`\x1b[33m[ActionHandlers]\x1b[0m Executing basic attack: ${state.currentTurn.name} → ${target.name}`);
     await this.executeBasicAttack(target);
-    await this.completeTurn();
+    
+    // ADD DELAY BEFORE COMPLETING TURN IN PvE
+    if (this.battle.mode === 'pve') {
+      console.log(`\x1b[35m[ActionHandlers]\x1b[0m Adding 750ms delay for PvE turn processing...`);
+      await new Promise(resolve => setTimeout(resolve, 750));
+    }
+    
+    await this.completeTurn(state.currentTurn.name);
   }
 
   async handleDodge(i: any): Promise<void> {
+    console.log(`\x1b[36m[ActionHandlers]\x1b[0m handleDodge called by ${i.user.username}`);
+    
     const dodgeOptions = [
       "dodge_and_increase_attack_bar",
       "dodge",
@@ -50,8 +62,16 @@ export class ActionHandlers {
       dodge: { option: randomDodge, id: this.battle.stateManager.getState().currentTurn?._id }
     });
 
+    console.log(`\x1b[33m[ActionHandlers]\x1b[0m Executing dodge: ${randomDodge}`);
     await this.battle.turnManager.performPlayerTurn();
-    await cycleCooldowns(this.battle.stateManager.getState().cooldowns);
+    await cycleCooldowns(this.battle.stateManager.getState().cooldowns, this.battle.stateManager.getState().currentTurn?.name);
+    
+    // ADD DELAY BEFORE COMPLETING TURN IN PvE
+    if (this.battle.mode === 'pve') {
+      console.log(`\x1b[35m[ActionHandlers]\x1b[0m Adding 750ms delay for PvE dodge processing...`);
+      await new Promise(resolve => setTimeout(resolve, 750));
+    }
+    
     await this.battle.turnManager.completeTurnAndContinue();
 
     await i.followUp({
@@ -120,9 +140,10 @@ export class ActionHandlers {
     await this.battle.turnManager.performPlayerTurn();
   }
 
-  private async completeTurn(): Promise<void> {
+  private async completeTurn(currentPlayerId: any): Promise<void> {
+    console.log(`\x1b[34m[ActionHandlers]\x1b[0m Completing turn for: ${currentPlayerId}`);
     const state = this.battle.stateManager.getState();
-    await cycleCooldowns(state.cooldowns);
+    await cycleCooldowns(state.cooldowns, currentPlayerId);
     await this.battle.turnManager.completeTurnAndContinue();
   }
 }

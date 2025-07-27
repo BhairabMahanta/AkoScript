@@ -66,7 +66,7 @@ export class Battle {
     scenario: any = null, // Made optional for PvP
     mode: BattleMode = 'pve'
   ) {
-    console.log(`[Battle] Constructor - Mode: ${mode}, Player: ${player?.name || 'Unknown'}`);
+
     
     this.player = player;
     this.message = message;
@@ -97,14 +97,14 @@ export class Battle {
 
     // Initialize based on mode
     if (mode === 'pve') {
-      console.log("[Battle] Initializing PvE mode");
+
       this.enemyDetails = opponent;
       this.selectedScenario = scenario;
       this.waveManager = new WaveManager(opponent, allEnemies, this);
       this.config = { player, enemy: opponent, message, scenario };
       this.initializePvEMode();
     } else {
-      console.log("[Battle] Initializing PvP mode");
+
       this.player2 = opponent;
       this.selectedScenario = null; // No scenario for PvP
       this.waveManager = null; // No waves for PvP
@@ -122,11 +122,11 @@ export class Battle {
     this.turnManager.initializePvPAI();
   }
     
-    console.log(`[Battle] Constructor completed - Mode: ${mode}`);
+
   }
 
   private initializePvEMode(): void {
-    console.log("[Battle] Setting up PvE mode");
+
     
     // Initialize player deck
     if (this.player.deck) {
@@ -165,15 +165,14 @@ export class Battle {
       aliveTeam: [this.player, ...this.familiarInfo],
     });
     
-    console.log(`[Battle] PvE mode initialized - Familiars: ${this.familiarInfo.length}, Mobs: ${this.mobs.length}`);
-  }
+    }
 
   private initializePvPMode(): void {
-    console.log("[Battle] Setting up PvP mode");
+ 
       // Mark player2 as AI if in AFK mode
   if (this.mode === 'pvp_afk') {
     this.player2.isAI = true;
-    console.log("[Battle] Player2 marked as AI for AFK mode");
+  
   }
     // Initialize player 1 deck
     if (this.player.deck) {
@@ -205,7 +204,7 @@ export class Battle {
   }
 
   async initialiseStuff(): Promise<void> {
-    console.log(`[Battle] Initializing battle stuff - Mode: ${this.mode}`);
+  
     
     try {
       if (this.mode === 'pve') {
@@ -213,7 +212,7 @@ export class Battle {
       } else {
         await this.initializePvPStuff();
       }
-      console.log("[Battle] Battle stuff initialized successfully");
+
     } catch (error) {
       console.error("[Battle] Initialization error:", error);
       this.stateManager.updateState({ continue: false });
@@ -221,7 +220,7 @@ export class Battle {
   }
 
   private async initializePvEStuff(): Promise<void> {
-    console.log("[Battle] Initializing PvE stuff");
+  
     
     // Check if waveManager exists before calling getNextWave
     if (!this.waveManager) {
@@ -265,14 +264,13 @@ export class Battle {
       aliveEnemies: this.allEnemies.flat(),
       continue: true,
     });
-    
-    console.log("[Battle] PvE stuff initialized successfully");
+
   }
 public isPlayer2AI(): boolean {
   return this.mode === 'pvp_afk';
 }
   private async initializePvPStuff(): Promise<void> {
-    console.log("[Battle] Initializing PvP stuff");
+
     
     // Set up characters for PvP
     this.characters = [
@@ -309,12 +307,10 @@ public isPlayer2AI(): boolean {
       continue: true,
     });
     
-    console.log("[Battle] PvP stuff initialized successfully");
   }
 
   // NEW: Direct PvP battle start method
   async startPvPBattleDirectly(): Promise<void> {
-    console.log(`[Battle] Starting direct PvP battle - Mode: ${this.mode}`);
     
     try {
       await this.initialiseStuff();
@@ -325,7 +321,7 @@ public isPlayer2AI(): boolean {
         return;
       }
 
-      console.log("[Battle] PvP initialization successful, proceeding to battle");
+
       await this.startBattle(this.message);
       
     } catch (error) {
@@ -337,12 +333,11 @@ public isPlayer2AI(): boolean {
   }
 
   async startEmbed(): Promise<void> {
-    console.log(`[Battle] Starting embed - Mode: ${this.mode}`);
+
     
     try {
       // For PvP modes, skip the initial embed and go directly to battle
       if (this.mode === 'pvp_realtime' || this.mode === 'pvp_afk') {
-        console.log(`[Battle] Skipping initial embed for ${this.mode}`);
         await this.startPvPBattleDirectly();
         return;
       }
@@ -504,7 +499,7 @@ Select **"Fight"** from the dropdown to enter combat!`;
 
 
   async startBattle(message: any): Promise<void> {
-    console.log(`[Battle] Starting battle - Mode: ${this.mode}`);
+
     
     try {
       await this.turnManager.getNextTurn();
@@ -516,7 +511,7 @@ Select **"Fight"** from the dropdown to enter combat!`;
         console.warn("[Battle] No current turn found, using fallback");
       }
 
-      console.log(`[Battle] Current turn: ${state.currentTurn?.name || 'Unknown'}`);
+
 
       const initialEmbed = await this.initialisedEmbed.sendInitialEmbed(
         state.currentTurn,
@@ -532,11 +527,10 @@ Select **"Fight"** from the dropdown to enter combat!`;
         components: await this.uiManager.createActionRows(),
       });
 
-      console.log("[Battle] Initial message sent, setting up collectors");
+
 
       // Enhanced interaction collector with better PvP filtering and logging
       const filter = (i: any) => {
-        console.log(`[Battle] Interaction received - User: ${i.user.username} (${i.user.id}), CustomId: ${i.customId}`);
         
         let isValidUser = false;
         
@@ -550,14 +544,11 @@ Select **"Fight"** from the dropdown to enter combat!`;
           
           isValidUser = i.user.id === player1Id || i.user.id === player2Id;
           
-          console.log(`[Battle] PvP filter - Player1: ${player1Id}, Player2: ${player2Id}, Interaction user: ${i.user.id}, Valid: ${isValidUser}`);
-        }
+              }
         
         const isValidCustomId = i.customId.startsWith("action_") || i.customId === "starter";
-        console.log(`[Battle] CustomId check - ${i.customId}, Valid: ${isValidCustomId}`);
         
         const result = isValidUser && isValidCustomId;
-        console.log(`[Battle] Filter result: ${result}`);
         
         return result;
       };
@@ -568,7 +559,7 @@ Select **"Fight"** from the dropdown to enter combat!`;
       });
 
       collector.on("collect", async (i: any) => {
-        console.log(`[Battle] Interaction collected - User: ${i.user.username} (${i.user.id}), CustomId: ${i.customId}`);
+
         
         try {
           await this.uiManager.handleInteraction(i);

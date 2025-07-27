@@ -1,5 +1,5 @@
 import { Command } from "../../@types/command";
-import { ExtendedClient } from '../../events/handlers/commandHandler';
+import { ExtendedClient } from "../..";
 import { Message } from 'discord.js';
 import { handleArenaButtonClick } from "./components/buttonHandler";
 import { createArenaMenuData } from "./arenaUtils";

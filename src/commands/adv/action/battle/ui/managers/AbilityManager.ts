@@ -16,8 +16,6 @@ export class AbilityManager {
     const state = this.battle.stateManager.getState();
     let abilityOptions: any[] = [];
 
-    console.log(`[AbilityManager] Getting ability options for: ${state.currentTurn?.name}`);
-
     if (!state.currentTurn) {
       console.error("[AbilityManager] No current turn found");
       return this.getDefaultAbilityOptions();
@@ -44,13 +42,12 @@ export class AbilityManager {
   }
 
   private async getFamiliarAbilities(currentTurn: any): Promise<any[]> {
-    console.log("[AbilityManager] Current turn is a familiar");
     
     if (currentTurn.ability && Array.isArray(currentTurn.ability)) {
       const moveFinder = currentTurn.ability.map((abilityName: string) =>
         getAbilities(abilityName)
       );
-      return this.processAbilities(moveFinder);
+      return this.processAbilities(moveFinder, currentTurn);
     } else {
       console.warn(`[AbilityManager] Familiar ${currentTurn.name} has no abilities or abilities is not an array`);
       return [];
@@ -58,7 +55,7 @@ export class AbilityManager {
   }
 
   private async getPlayerAbilities(currentTurn: any): Promise<any[]> {
-    console.log("[AbilityManager] Current turn is a player");
+
     
     const playerClass = this.characterIdentifier.getPlayerClass(currentTurn);
     if (playerClass && classes[playerClass] && classes[playerClass].abilities) {
@@ -66,7 +63,7 @@ export class AbilityManager {
       const moveFinder = playerAbility.map((abilityName: string) =>
         getPlayerMoves(abilityName)
       );
-      return this.processAbilities(moveFinder);
+      return this.processAbilities(moveFinder, currentTurn);
     } else {
       console.warn(`[AbilityManager] Player ${currentTurn.name} has no valid class or abilities`);
       return [];
@@ -80,24 +77,33 @@ export class AbilityManager {
       const moveFinder = currentTurn.ability.map((abilityName: string) =>
         getAbilities(abilityName)
       );
-      return this.processAbilities(moveFinder);
+      return this.processAbilities(moveFinder, currentTurn);
     } else if (currentTurn.class && classes[currentTurn.class]) {
       const playerAbility = classes[currentTurn.class].abilities;
       const moveFinder = playerAbility.map((abilityName: string) =>
         getPlayerMoves(abilityName)
       );
-      return this.processAbilities(moveFinder);
+      return this.processAbilities(moveFinder, currentTurn);
     }
     
     return [];
   }
 
-  private processAbilities(abilities: any[]): any[] {
-    const state = this.battle.stateManager.getState();
+  // FIXED: Now takes currentTurn parameter to check character-specific cooldowns
+  private processAbilities(abilities: any[], currentTurn: any): any[] {
+    const characterId = currentTurn._id || currentTurn.id || currentTurn.serialId;
     
     return abilities
       .map((ability: any) => {
-        if (!ability || (state.cooldowns && state.cooldowns.some((cooldown: any) => cooldown.name === ability.name))) {
+        if (!ability) {
+          return null;
+        }
+
+        // FIXED: Check if THIS specific character has the ability on cooldown
+        const isOnCooldown = this.battle.stateManager.isAbilityOnCooldown(ability.name, currentTurn.name);
+        
+        if (isOnCooldown) {
+
           return null;
         }
 
@@ -133,10 +139,16 @@ export class AbilityManager {
 
   private finalizeAbilityOptions(abilityOptions: any[]): any[] {
     const state = this.battle.stateManager.getState();
+    const currentTurn = state.currentTurn;
+    const characterId = currentTurn?._id || currentTurn?.id || currentTurn?.serialId;
     
-    const cooldownDescriptions = state.cooldowns && state.cooldowns.length > 0
-      ? "Click here to see your cooldowns"
-      : "There are no cooldowns currently.";
+    // FIXED: Show character-specific cooldowns
+    const characterCooldowns = characterId ? 
+      this.battle.stateManager.getCharacterCooldowns(characterId) : [];
+    
+    const cooldownDescriptions = characterCooldowns.length > 0
+      ? `${currentTurn?.name} has ${characterCooldowns.length} abilities on cooldown`
+      : `${currentTurn?.name} has no cooldowns currently.`;
     
     abilityOptions.push({
       label: "Cooldowns",

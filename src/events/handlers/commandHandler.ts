@@ -1,3 +1,4 @@
+// CommandHandler.ts - COMPLETE UPDATE
 import {
   Client,
   Collection,
@@ -14,6 +15,7 @@ import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
 import { SlashCommand } from "../../@types/command";
+import { APIMonitor } from "../../monitoring/APIMonitor";
 
 // Database model for server-specific settings
 interface GuildSettings extends mongoose.Document {
@@ -58,7 +60,7 @@ export interface Command {
   ) => Promise<void>;
 }
 
-// Extended client type
+// UPDATED ExtendedClient interface with monitoring
 export interface ExtendedClient extends Client {
   config: BotConfig;
   commands: Collection<string, Command>;
@@ -69,8 +71,9 @@ export interface ExtendedClient extends Client {
     GuildSettings: typeof GuildSettingsModel;
   };
   reloadCommand: (commandName: string) => Promise<void>;
+  // ONLY keep apiMonitor
+  apiMonitor: APIMonitor;
 }
-
 export class CommandHandler {
   private client: ExtendedClient;
   private cooldowns: Collection<string, Collection<string, number>>;
@@ -131,7 +134,6 @@ export class CommandHandler {
       const command: Command = commandModule.default;
 
       if (!command?.name) {
-        // console.warn(`Skipping invalid command file: ${filePath}`);
         return;
       }
 
@@ -177,6 +179,9 @@ export class CommandHandler {
   // Handle commands with enhanced features
   async handleCommand(message: Message): Promise<void> {
     if (!message.content || message.author.bot || !message.guild) return;
+
+    // ADD COMMAND EXECUTION TRACKING
+    const commandStartTime = Date.now();
 
     // Get guild-specific prefix
     const prefix = await this.getPrefix(message.guild.id);
@@ -289,12 +294,55 @@ export class CommandHandler {
         }
       }
 
+      // EXECUTE COMMAND AND TRACK PERFORMANCE
       await command.execute(this.client, message, args);
+      
+      // LOG SUCCESSFUL COMMAND EXECUTION
+      const executionTime = Date.now() - commandStartTime;
+      await this.logCommandExecution(command.name, message.author.id, message.guild.id, executionTime, true);
+      
     } catch (error) {
       console.error(`Command Error [${command.name}]:`, error);
+      
+      // LOG FAILED COMMAND EXECUTION
+      const executionTime = Date.now() - commandStartTime;
+      await this.logCommandExecution(command.name, message.author.id, message.guild.id, executionTime, false);
+      
+      // TRACK API ERROR IF MONITORING IS AVAILABLE
+      if (this.client.apiMonitor) {
+        this.client.apiMonitor.trackInvalidRequest(`Command error: ${command.name}`);
+      }
+      
       message
         .reply("An error occurred while executing this command.")
         .catch(console.error);
+    }
+  }
+
+  // ADD COMMAND LOGGING METHOD
+  private async logCommandExecution(
+    commandName: string,
+    userId: string,
+    guildId: string,
+    executionTime: number,
+    success: boolean
+  ): Promise<void> {
+    try {
+      // Import mongoClient dynamically to avoid circular imports
+      const { mongoClient } = require("../../data/mongo/mongo");
+      const db = mongoClient.db("Akaimnky");
+      
+      await db.collection('command_analytics').insertOne({
+        command: commandName,
+        userId,
+        guildId,
+        executionTime,
+        success,
+        timestamp: new Date(),
+        apiCallsBefore: this.client.apiMonitor?.getMetrics().totalCalls || 0
+      });
+    } catch (error) {
+      console.error('Failed to log command execution:', error);
     }
   }
 

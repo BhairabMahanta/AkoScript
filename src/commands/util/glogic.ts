@@ -13,6 +13,7 @@ import { BuffDebuffLogic } from "../gamelogic/buffdebufflogic";
 import { mongoClient } from "../../data/mongo/mongo";
 
 import allFamiliars from "../../data/information/allfamiliars";
+import { Cooldown } from "../adv/action/battle/managers/BattleStateManager";
 const {
   calculateDamage,
   calculateCritDamage,
@@ -443,27 +444,41 @@ export function getTier(rates: DropRates): number {
   return 3;
 }
 
-async function cycleCooldowns(array: Move[]): Promise<void> {
+async function cycleCooldowns(cooldownArray: any[], currentCharacterName: string): Promise<void> {
   try {
-    if (array.length === 0) {
+    if (cooldownArray.length === 0) {
       console.log("No moves on cooldown");
       return;
     }
 
-    array.forEach((item) => {
-      if (item.cooldown > 0) {
-        item.cooldown--;
-        if (item.cooldown === 0) {
-          console.log(`${item.name} is no longer on cooldown.`);
-          array.splice(array.indexOf(item), 1);
-          console.log("array:", array);
+    // Only cycle cooldowns for the character whose turn just ended
+    for (let i = cooldownArray.length - 1; i >= 0; i--) {
+      const cooldown = cooldownArray[i];
+      
+      // Only reduce cooldown if it belongs to the character who just acted
+      if (cooldown.characterName === currentCharacterName) {
+        
+        if (cooldown.cooldown > 0) {
+          cooldown.cooldown--;
+          
+          if (cooldown.cooldown === 0) {
+            console.log(`${cooldown.name} is no longer on cooldown for ${cooldown.characterName}.`);
+            cooldownArray.splice(i, 1);
+          } else {
+            console.log(`${cooldown.name} cooldown: ${cooldown.cooldown} turns remaining for ${cooldown.characterName}`);
+          }
         }
       }
-    });
+    }
+    
+    console.log(`Active cooldowns remaining: ${cooldownArray.length}`);
   } catch (error) {
-    console.error("There isn't any moves on cooldown", error);
+    console.error("Error cycling cooldowns:", error);
   }
 }
+
+
+
 
 // Export functions for use in other files
 export {

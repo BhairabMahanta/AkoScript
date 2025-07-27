@@ -1,6 +1,11 @@
 // managers/BattleStateManager.ts
 import { BattleState, PlayerTargetData } from '../types/BattleTypes';
-
+export interface Cooldown {
+  name: string;          // Ability name
+  characterId: string;   // Character ID who used the ability
+  characterName: string; // Character name for logging
+  cooldown: number;      // Remaining turns
+}
 export class BattleStateManager {
   private state: BattleState;
 
@@ -43,9 +48,32 @@ export class BattleStateManager {
     this.state.battleLogs = [];
   }
 
-  addCooldown(cooldown: any): void {
+addCooldown(cooldown: any): void {
+    // Ensure we have character identification
+    if (!cooldown.characterId) {
+      console.error("Cooldown added without character ID:", cooldown);
+      return;
+    }
+    
     this.state.cooldowns.push(cooldown);
+    console.log(`[BattleStateManager] Added cooldown: ${cooldown.name} for ${cooldown.characterName} (${cooldown.cooldown} turns)`);
   }
+
+  // NEW: Check if specific character has ability on cooldown
+  isAbilityOnCooldown(abilityName: string, characterName: string): boolean {
+    return this.state.cooldowns.some(cooldown => 
+      cooldown.name === abilityName && 
+      cooldown.characterName === characterName
+    );
+  }
+
+  // Update this method too
+  getCharacterCooldowns(characterName: string): any[] {
+    return this.state.cooldowns.filter(cooldown => 
+      cooldown.characterName === characterName
+    );
+  }
+
 
   setCooldowns(cooldowns: any[]): void {
     this.state.cooldowns = cooldowns;

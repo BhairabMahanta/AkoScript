@@ -1,4 +1,4 @@
-// ui/interactions/handlers/AbilityHandlers.ts
+// ui/interactions/handlers/AbilityHandlers.ts - COMPLETE VERSION
 import { cycleCooldowns } from '../../../../../../util/glogic';
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ModalSubmitInteraction } from "discord.js";
 import abilities from "../../../../../../../data/abilities";
@@ -25,6 +25,8 @@ export class AbilityHandlers {
   }
 
   async handleAbilitySelection(i: any, selectedValue: string): Promise<void> {
+    console.log(`\x1b[36m[AbilityHandlers]\x1b[0m handleAbilitySelection called by ${i.user.username}`);
+    
     const state = this.battle.stateManager.getState();
     const currentPlayerId = this.characterIdentifier.getCurrentPlayerIdFromUserId(i.user.id);
     await i.deferUpdate();
@@ -39,6 +41,8 @@ export class AbilityHandlers {
     
     const abilityName = selectedValue.replace("ability-", "");
     
+    console.log(`\x1b[33m[AbilityHandlers]\x1b[0m Executing ability: ${abilityName} by ${state.currentTurn.name}`);
+    
     await this.battle.ability.executeAbility(
       state.currentTurn,
       target,
@@ -47,11 +51,20 @@ export class AbilityHandlers {
       abilityName
     );
     
-    await cycleCooldowns(state.cooldowns);
+    await cycleCooldowns(state.cooldowns, state.currentTurn.name);
+    
+    // ADD DELAY BEFORE COMPLETING TURN IN PvE
+    if (this.battle.mode === 'pve') {
+      console.log(`\x1b[35m[AbilityHandlers]\x1b[0m Adding 750ms delay for PvE ability processing...`);
+      await new Promise(resolve => setTimeout(resolve, 750));
+    }
+    
     await this.battle.turnManager.completeTurnAndContinue();
   }
 
   async handleModalSelection(i: any, selectedValue: string): Promise<void> {
+    console.log(`\x1b[36m[AbilityHandlers]\x1b[0m handleModalSelection called by ${i.user.username}`);
+    
     const abilityName = selectedValue.replace("selection-", "");
     const ability = abilities[abilityName];
 
@@ -148,6 +161,8 @@ export class AbilityHandlers {
 
       await modalInteraction.deferUpdate();
       
+      console.log(`\x1b[33m[AbilityHandlers]\x1b[0m Executing modal ability: ${abilityName} on ${selectedTargets.length} targets`);
+      
       const state = this.battle.stateManager.getState();
       await this.battle.ability.executeAbility(
         state.currentTurn,
@@ -157,7 +172,14 @@ export class AbilityHandlers {
         abilityName
       );
 
-      await cycleCooldowns(state.cooldowns);
+      await cycleCooldowns(state.cooldowns, state.currentTurn.name);
+      
+      // ADD DELAY BEFORE COMPLETING TURN IN PvE
+      if (this.battle.mode === 'pve') {
+        console.log(`\x1b[35m[AbilityHandlers]\x1b[0m Adding 750ms delay for PvE modal ability processing...`);
+        await new Promise(resolve => setTimeout(resolve, 750));
+      }
+      
       await this.battle.turnManager.completeTurnAndContinue();
     } catch (error) {
       console.error("Modal submission error:", error);

@@ -47,7 +47,8 @@ export class BattleResultManager {
       } else {
         await this.handlePvPDefeat();
       }
-    } else {
+     } 
+     else {
       await this.updateBattleDisplay();
     }
   }

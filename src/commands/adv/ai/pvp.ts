@@ -1,7 +1,8 @@
-// ai/pvp.ts
+// ai/pvp.ts - CLEANED VERSION
 import { calculateDamage } from "../../util/glogic";
 import { Ability } from "../../gamelogic/abilitiesFunction";
 import classes from "../../../data/classes/allclasses";
+import abilities from "../../../data/abilities";
 import { ExtendedPlayer } from "../../gamelogic/buffdebufflogic";
 
 interface AITarget {
@@ -20,9 +21,10 @@ interface AITarget {
 
 interface AIDecision {
   action: 'basic_attack' | 'ability' | 'dodge';
-  target?: AITarget;
+  target?: AITarget | AITarget[];
   abilityName?: string;
   reasoning?: string;
+  isMultiTarget?: boolean;
 }
 
 export class PvPAI {
@@ -72,10 +74,53 @@ export class PvPAI {
     return priorities[Math.floor(Math.random() * priorities.length)] as any;
   }
 
-  async makeDecision(currentTurn: ExtendedPlayer, availableTargets: AITarget[]): Promise<AIDecision> {
-    console.log(`[PvPAI] Making decision for ${currentTurn.name}`);
-    console.log(`[PvPAI] Available targets: ${availableTargets.map(t => t.name).join(', ')}`);
+  // CLEANED: Removed 6 repetitive logs that spam every AI turn
+  private getTargetPools(): { aiTeam: AITarget[], enemies: AITarget[] } {
+    const state = this.battle.stateManager.getState();
     
+    const currentTurnId = state.currentTurn?._id || state.currentTurn?.id;
+    const aiPlayerId = this.player._id || this.player.id;
+    
+    // REMOVED: These 6 logs that repeat constantly
+    // console.log(`[PvPAI] Current turn ID: ${currentTurnId}, AI Player ID: ${aiPlayerId}`);
+    // console.log(`[PvPAI] State aliveTeam: ${state.aliveTeam?.map((t: any) => `${t.name}(${t._id})`).join(', ')}`);
+    // console.log(`[PvPAI] State aliveEnemies: ${state.aliveEnemies?.map((t: any) => `${t.name}(${t._id})`).join(', ')}`);
+    
+    const aiInTeam = state.aliveTeam?.some((member: any) => 
+      (member._id === currentTurnId) || (member.id === currentTurnId) ||
+      (member._id === aiPlayerId) || (member.id === aiPlayerId)
+    );
+    
+    const aiInEnemies = state.aliveEnemies?.some((member: any) => 
+      (member._id === currentTurnId) || (member.id === currentTurnId) ||
+      (member._id === aiPlayerId) || (member.id === aiPlayerId)
+    );
+    
+    let aiTeam: AITarget[];
+    let enemies: AITarget[];
+    
+    if (aiInTeam) {
+      aiTeam = state.aliveTeam || [];
+      enemies = state.aliveEnemies || [];
+      // REMOVED: console.log(`[PvPAI] AI is in aliveTeam`);
+    } else if (aiInEnemies) {
+      aiTeam = state.aliveEnemies || [];
+      enemies = state.aliveTeam || [];
+      // REMOVED: console.log(`[PvPAI] AI is in aliveEnemies`);
+    } else {
+      aiTeam = state.aliveEnemies || [];
+      enemies = state.aliveTeam || [];
+      // REMOVED: console.log(`[PvPAI] Fallback: AI assumed to be defending`);
+    }
+    
+    // REMOVED: These 2 logs that repeat constantly
+    // console.log(`[PvPAI] AI Team (${aiTeam.length}): ${aiTeam.map((t: any) => t.name).join(', ')}`);
+    // console.log(`[PvPAI] Enemies (${enemies.length}): ${enemies.map((t: any) => t.name).join(', ')}`);
+    
+    return { aiTeam, enemies };
+  }
+
+  async makeDecision(currentTurn: ExtendedPlayer, availableTargets: AITarget[]): Promise<AIDecision> {
     const emergencyDecision = this.checkEmergencyActions(currentTurn, availableTargets);
     if (emergencyDecision) {
       return emergencyDecision;
@@ -83,36 +128,57 @@ export class PvPAI {
 
     const availableAbilities = this.getAvailableAbilities(currentTurn);
     const actionType = this.decideActionType(currentTurn, availableTargets, availableAbilities);
-    const target = this.selectTarget(availableTargets, actionType);
     
     switch (actionType) {
       case 'basic_attack':
+        const { enemies } = this.getTargetPools();
+        const attackTarget = this.selectTarget(enemies.length > 0 ? enemies : availableTargets, 'attack');
         return {
           action: 'basic_attack',
-          target,
-          reasoning: `Basic attack on ${target.name}`
+          target: attackTarget,
+          reasoning: `Basic attack on ${attackTarget.name}`,
+          isMultiTarget: false
         };
         
       case 'ability':
-        const selectedAbility = this.selectAbility(availableAbilities, currentTurn, target);
+        const selectedAbility = this.selectAbility(availableAbilities, currentTurn, availableTargets);
+        
+        if (!selectedAbility || selectedAbility === 'basic_attack') {
+          const { enemies } = this.getTargetPools();
+          const fallbackTarget = this.selectTarget(enemies.length > 0 ? enemies : availableTargets, 'attack');
+          return {
+            action: 'basic_attack',
+            target: fallbackTarget,
+            reasoning: `No abilities available, using basic attack on ${fallbackTarget.name}`,
+            isMultiTarget: false
+          };
+        }
+        
+        const abilityTargets = this.selectAbilityTargets(selectedAbility, currentTurn, availableTargets);
+        
         return {
           action: 'ability',
-          target,
+          target: abilityTargets,
           abilityName: selectedAbility,
-          reasoning: `Using ${selectedAbility} on ${target.name}`
+          reasoning: `Using ${selectedAbility}${Array.isArray(abilityTargets) ? ` on ${abilityTargets.length} targets` : ` on ${(abilityTargets as AITarget).name}`}`,
+          isMultiTarget: Array.isArray(abilityTargets)
         };
         
       case 'dodge':
         return {
           action: 'dodge',
-          reasoning: 'Taking defensive action'
+          reasoning: 'Taking defensive action',
+          isMultiTarget: false
         };
         
       default:
+        const { enemies: fallbackEnemies } = this.getTargetPools();
+        const fallbackTarget = this.selectTarget(fallbackEnemies.length > 0 ? fallbackEnemies : availableTargets, 'attack');
         return {
           action: 'basic_attack',
-          target,
-          reasoning: 'Fallback basic attack'
+          target: fallbackTarget,
+          reasoning: 'Fallback basic attack',
+          isMultiTarget: false
         };
     }
   }
@@ -121,22 +187,50 @@ export class PvPAI {
     const hpPercentage = currentTurn.stats.hp / currentTurn.stats.maxHp;
     
     if (hpPercentage < 0.2) {
+      // KEEP: This is important emergency info
       console.log(`[PvPAI] Emergency: ${currentTurn.name} health critically low`);
+      
+      const availableAbilities = this.getAvailableAbilities(currentTurn);
+      const defensiveAbilities = availableAbilities.filter(abilityName => {
+        const ability = abilities[abilityName];
+        return ability && (
+          ability.logicType === 'increase_defense' ||
+          ability.name.toLowerCase().includes('defend') ||
+          ability.name.toLowerCase().includes('protect') ||
+          ability.type.includes('buff')
+        );
+      });
+
+      if (defensiveAbilities.length > 0 && Math.random() < 0.7) {
+        const selectedDefensiveAbility = defensiveAbilities[0];
+        const targets = this.selectAbilityTargets(selectedDefensiveAbility, currentTurn, availableTargets);
+        
+        return {
+          action: 'ability',
+          target: targets,
+          abilityName: selectedDefensiveAbility,
+          reasoning: 'Emergency defensive action',
+          isMultiTarget: Array.isArray(targets)
+        };
+      }
       
       if (Math.random() < 0.6) {
         return {
           action: 'dodge',
-          reasoning: 'Emergency dodge due to low health'
+          reasoning: 'Emergency dodge due to low health',
+          isMultiTarget: false
         };
       }
       
       const healingAbilities = this.getHealingAbilities(currentTurn);
       if (healingAbilities.length > 0) {
+        const healTargets = this.selectAbilityTargets(healingAbilities[0], currentTurn, availableTargets);
         return {
           action: 'ability',
-          target: currentTurn as any,
+          target: healTargets,
           abilityName: healingAbilities[0],
-          reasoning: 'Emergency healing'
+          reasoning: 'Emergency healing',
+          isMultiTarget: Array.isArray(healTargets)
         };
       }
     }
@@ -147,11 +241,31 @@ export class PvPAI {
   private decideActionType(currentTurn: any, availableTargets: AITarget[], availableAbilities: string[]): 'basic_attack' | 'ability' | 'dodge' {
     const hpPercentage = currentTurn.stats.hp / currentTurn.stats.maxHp;
     const enemyCount = availableTargets.length;
-    const hasUsefulAbilities = availableAbilities.length > 0;
+    
+    const hasRealAbilities = availableAbilities.length > 0 && 
+                             availableAbilities.some(abilityName => abilities[abilityName]);
     
     let basicAttackChance = 0.4;
-    let abilityChance = hasUsefulAbilities ? 0.4 : 0.0;
+    let abilityChance = hasRealAbilities ? 0.4 : 0.0;
     let dodgeChance = 0.2;
+    
+    if (!hasRealAbilities) {
+      basicAttackChance += 0.4;
+      abilityChance = 0.0;
+    }
+    
+    if (hasRealAbilities) {
+      const { aiTeam } = this.getTargetPools();
+      const teamNeedsDefense = aiTeam.some((member: any) => {
+        const memberHpPercentage = member.stats.hp / member.stats.maxHp;
+        return memberHpPercentage < 0.6;
+      });
+
+      if (teamNeedsDefense) {
+        abilityChance += 0.3;
+        basicAttackChance -= 0.2;
+      }
+    }
     
     basicAttackChance += this.aiPersonality.aggressiveness * 0.3;
     abilityChance += this.aiPersonality.abilityUsage * 0.3;
@@ -162,10 +276,14 @@ export class PvPAI {
       basicAttackChance -= 0.1;
     }
     
-    if (enemyCount > 2) {
+    if (enemyCount > 2 && hasRealAbilities) {
       abilityChance += 0.2;
       basicAttackChance -= 0.1;
     }
+    
+    basicAttackChance = Math.max(0.1, basicAttackChance);
+    abilityChance = Math.max(0.0, abilityChance);
+    dodgeChance = Math.max(0.0, dodgeChance);
     
     const total = basicAttackChance + abilityChance + dodgeChance;
     basicAttackChance /= total;
@@ -174,60 +292,210 @@ export class PvPAI {
     
     const rand = Math.random();
     
+    // KEEP: This is useful decision info
+    console.log(`[PvPAI] Action chances - Basic: ${(basicAttackChance * 100).toFixed(1)}%, Ability: ${(abilityChance * 100).toFixed(1)}%, Dodge: ${(dodgeChance * 100).toFixed(1)}%`);
+    
     if (rand < basicAttackChance) {
       return 'basic_attack';
-    } else if (rand < basicAttackChance + abilityChance) {
+    } else if (rand < basicAttackChance + abilityChance && hasRealAbilities) {
       return 'ability';
     } else {
       return 'dodge';
     }
   }
 
-  private selectTarget(availableTargets: AITarget[], actionType: string): AITarget {
-    if (availableTargets.length === 1) {
-      return availableTargets[0];
+  private selectTarget(targetPool: AITarget[], actionType: string): AITarget {
+    if (targetPool.length === 1) {
+      return targetPool[0];
+    }
+    
+    if (targetPool.length === 0) {
+      console.error(`[PvPAI] No targets available for ${actionType}`);
+      return { name: 'No Target', stats: { attack: 0, defense: 0, hp: 1, maxHp: 1 }, statuses: { buffs: [], debuffs: [] } };
     }
     
     switch (this.aiPersonality.targetPriority) {
       case 'weakest':
-        return availableTargets.reduce((weakest, current) => 
+        return targetPool.reduce((weakest, current) => 
           current.stats.hp < weakest.stats.hp ? current : weakest
         );
         
       case 'strongest':
-        return availableTargets.reduce((strongest, current) => 
+        return targetPool.reduce((strongest, current) => 
           current.stats.hp > strongest.stats.hp ? current : strongest
         );
         
       case 'player_first':
-        const players = availableTargets.filter(t => !t.name.includes('familiar'));
+        const players = targetPool.filter(t => !t.name.includes('familiar'));
         if (players.length > 0) {
           return players[Math.floor(Math.random() * players.length)];
         }
-        return availableTargets[Math.floor(Math.random() * availableTargets.length)];
+        return targetPool[Math.floor(Math.random() * targetPool.length)];
         
       case 'random':
       default:
-        return availableTargets[Math.floor(Math.random() * availableTargets.length)];
+        return targetPool[Math.floor(Math.random() * targetPool.length)];
     }
+  }
+
+  private selectAbilityTargets(abilityName: string, currentTurn: ExtendedPlayer, availableTargets: AITarget[]): AITarget | AITarget[] {
+    const ability = abilities[abilityName];
+    if (!ability) {
+      console.error(`[PvPAI] Ability ${abilityName} not found`);
+      const { enemies } = this.getTargetPools();
+      return this.selectTarget(enemies.length > 0 ? enemies : availableTargets, 'attack');
+    }
+
+    // REMOVED: Repetitive targeting info
+    // console.log(`[PvPAI] Selecting targets for ${abilityName} (type: ${ability.type}, logicType: ${ability.logicType})`);
+
+    if (ability.selection && ability.selection.startsWith('modal_')) {
+      const requiredCount = parseInt(ability.selection.replace('modal_', ''), 10);
+      return this.selectMultipleTargets(ability, requiredCount, currentTurn);
+    }
+
+    return this.selectSingleTarget(ability, currentTurn, availableTargets);
+  }
+
+  private selectSingleTarget(ability: any, currentTurn: ExtendedPlayer, availableTargets: AITarget[]): AITarget {
+    const shouldTargetTeam = this.shouldTargetTeam(ability);
+    const { aiTeam, enemies } = this.getTargetPools();
+    
+    if (shouldTargetTeam) {
+      return this.selectTeamTarget(currentTurn);
+    } else {
+      return this.selectTarget(enemies.length > 0 ? enemies : availableTargets, 'attack');
+    }
+  }
+
+  private selectMultipleTargets(ability: any, requiredCount: number, currentTurn: ExtendedPlayer): AITarget[] {
+    const shouldTargetTeam = this.shouldTargetTeam(ability);
+    const { aiTeam, enemies } = this.getTargetPools();
+    
+    let targetPool: AITarget[] = [];
+    
+    if (shouldTargetTeam) {
+      targetPool = aiTeam;
+      // REMOVED: Repetitive targeting logs
+      // console.log(`[PvPAI] Targeting AI's team for ${ability.name}, available team: ${targetPool.map(t => t.name).join(', ')}`);
+    } else {
+      targetPool = enemies;
+      // REMOVED: Repetitive targeting logs
+      // console.log(`[PvPAI] Targeting enemies for ${ability.name}, available enemies: ${targetPool.map(t => t.name).join(', ')}`);
+    }
+
+    if (targetPool.length === 0) {
+      console.error(`[PvPAI] No valid targets available for ${ability.name}`);
+      return [];
+    }
+
+    const actualRequiredCount = Math.min(requiredCount, targetPool.length);
+    
+    if (shouldTargetTeam && (ability.logicType === 'increase_defense' || ability.name.toLowerCase().includes('defend'))) {
+      const sortedTargets = targetPool.sort((a, b) => {
+        const aHpPercent = a.stats.hp / a.stats.maxHp;
+        const bHpPercent = b.stats.hp / b.stats.maxHp;
+        return aHpPercent - bHpPercent;
+      });
+      
+      const selectedTargets = sortedTargets.slice(0, actualRequiredCount);
+      // KEEP: This shows AI decision result
+      console.log(`[PvPAI] Selected ${selectedTargets.length} AI team targets for defense: ${selectedTargets.map(t => t.name).join(', ')}`);
+      return selectedTargets;
+    }
+
+    const shuffled = [...targetPool].sort(() => Math.random() - 0.5);
+    const selectedTargets = shuffled.slice(0, actualRequiredCount);
+    // REMOVED: Repetitive selection log - only keep important defense ones above
+    return selectedTargets;
+  }
+
+  private shouldTargetTeam(ability: any): boolean {
+    const teamTargetingTypes = [
+      'buff_self', 'buff', 'buff_many', 'heal', 'heal_many', 'heal_hit',
+      'increase_self', 'increase_many', 'heal_buff', 'heal_special_effect',
+      'buff_special_effect', 'special_buff'
+    ];
+
+    const enemyTargetingTypes = [
+      'attack', 'attack_many', 'debuff', 'debuff_many', 'decrease', 'decrease_hit',
+      'decrease_many_hit', 'special_hit', 'hit_debuff', 'debuff_hit',
+      'special_debuff', 'debuff_special_effect'
+    ];
+
+    if (ability.logicType === 'increase_defense') {
+      // REMOVED: Repetitive targeting decision log
+      // console.log(`[PvPAI] ${ability.name} targets team (increase_defense logicType)`);
+      return true;
+    }
+
+    if (teamTargetingTypes.some(type => ability.type.includes(type))) {
+      // REMOVED: Repetitive targeting decision log
+      return true;
+    }
+
+    if (enemyTargetingTypes.some(type => ability.type.includes(type))) {
+      // REMOVED: Repetitive targeting decision log
+      return false;
+    }
+
+    if (ability.type.includes('buff') || ability.type.includes('heal') || ability.type.includes('increase')) {
+      // REMOVED: Repetitive targeting decision log
+      return true;
+    }
+
+    // REMOVED: Repetitive targeting decision log
+    return false;
+  }
+
+  private selectTeamTarget(currentTurn: ExtendedPlayer): AITarget {
+    const { aiTeam } = this.getTargetPools();
+    
+    if (aiTeam.length === 0) {
+      return currentTurn as any;
+    }
+
+    const sortedByHp = aiTeam.sort((a: any, b: any) => {
+      const aHpPercent = a.stats.hp / a.stats.maxHp;
+      const bHpPercent = b.stats.hp / b.stats.maxHp;
+      return aHpPercent - bHpPercent;
+    });
+
+    return sortedByHp[0];
   }
 
   private getAvailableAbilities(currentTurn: ExtendedPlayer): string[] {
     const state = this.battle.stateManager.getState();
-    const cooldowns = state.cooldowns || [];
+    const characterId = currentTurn._id || currentTurn.id;
     
     try {
-      let abilities: string[] = [];
+      let classAbilities: string[] = [];
       
       if (currentTurn.class && classes[currentTurn.class]) {
-        abilities = classes[currentTurn.class].abilities || [];
+        classAbilities = classes[currentTurn.class].abilities || [];
       }
+      // REMOVED: Debug log that's not critical
+      // console.log("classAbilities", classAbilities);
       
-      const availableAbilities = abilities.filter(abilityName => 
-        !cooldowns.some((cooldown: any) => cooldown.name === abilityName)
-      );
+      const availableAbilities = classAbilities.filter((abilityName: any) => {
+        if (!abilities[abilityName.toString()]) {
+          console.warn(`[PvPAI] Ability ${abilityName} from class ${currentTurn.class} not found in abilities database`);
+          return false;
+        }
+        
+        const isOnCooldown = this.battle.stateManager.isAbilityOnCooldown(abilityName, characterId);
+        
+        if (isOnCooldown) {
+          // REMOVED: Repetitive cooldown log
+          // console.log(`[PvPAI] ${abilityName} is on cooldown for ${currentTurn.name}`);
+          return false;
+        }
+        
+        return true;
+      });
       
-      console.log(`[PvPAI] Available abilities for ${currentTurn.name}:`, availableAbilities);
+      // KEEP: This shows available abilities result
+      console.log(`[PvPAI] Available abilities for ${currentTurn.name} (${characterId}):`, availableAbilities);
       return availableAbilities;
     } catch (error) {
       console.error(`[PvPAI] Error getting abilities:`, error);
@@ -246,24 +514,68 @@ export class PvPAI {
     );
   }
 
-  private selectAbility(availableAbilities: string[], currentTurn: ExtendedPlayer, target: AITarget): string {
+  private selectAbility(availableAbilities: string[], currentTurn: ExtendedPlayer, availableTargets: AITarget[]): string | null {
     if (availableAbilities.length === 0) {
-      return 'basic_attack';
+      // REMOVED: Repetitive "no abilities" log
+      return null;
     }
     
-    const randomIndex = Math.floor(Math.random() * availableAbilities.length);
-    return availableAbilities[randomIndex];
+    const validAbilities = availableAbilities.filter(abilityName => {
+      const ability = abilities[abilityName];
+      if (!ability) {
+        console.warn(`[PvPAI] Ability ${abilityName} not found in database`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (validAbilities.length === 0) {
+      // REMOVED: Repetitive "no valid abilities" log
+      return null;
+    }
+    
+    const { aiTeam } = this.getTargetPools();
+    const teamInDanger = aiTeam.some((member: any) => {
+      const hpPercentage = member.stats.hp / member.stats.maxHp;
+      return hpPercentage < 0.4;
+    });
+
+    if (teamInDanger) {
+      const defensiveAbilities = validAbilities.filter(abilityName => {
+        const ability = abilities[abilityName];
+        return ability && (
+          ability.logicType === 'increase_defense' ||
+          ability.name.toLowerCase().includes('defend') ||
+          ability.name.toLowerCase().includes('protect') ||
+          ability.type.includes('buff')
+        );
+      });
+
+      if (defensiveAbilities.length > 0) {
+        // KEEP: This shows important AI decision
+        console.log(`[PvPAI] AI team in danger, using defensive ability: ${defensiveAbilities[0]}`);
+        return defensiveAbilities[0];
+      }
+    }
+    
+    const randomIndex = Math.floor(Math.random() * validAbilities.length);
+    const selectedAbility = validAbilities[randomIndex];
+    // KEEP: This shows AI's ability choice
+    console.log(`[PvPAI] Selected ability: ${selectedAbility}`);
+    return selectedAbility;
   }
 
   async executeDecision(decision: AIDecision): Promise<void> {
+    // KEEP: This shows AI execution
     console.log(`[PvPAI] Executing decision: ${decision.action} - ${decision.reasoning}`);
     
     const state = this.battle.stateManager.getState();
     const currentPlayerId = this.player.id || this.player._id;
+    const currentTurnName = state.currentTurn?.name || 'Unknown';
     
     switch (decision.action) {
       case 'basic_attack':
-        if (decision.target) {
+        if (decision.target && !Array.isArray(decision.target)) {
           this.battle.stateManager.setPlayerTarget(currentPlayerId, decision.target, false);
           
           this.battle.stateManager.updateState({
@@ -272,28 +584,49 @@ export class PvPAI {
           });
           
           await this.battle.turnManager.performPlayerTurn();
-          this.battle.addBattleLog(`+ ${this.player.name} attacks ${decision.target.name} using basic attack`);
         }
         break;
         
       case 'ability':
         if (decision.target && decision.abilityName) {
-          this.battle.stateManager.setPlayerTarget(currentPlayerId, decision.target, false);
-          
-          this.battle.stateManager.updateState({
-            enemyToHit: decision.target,
-            pickedChoice: true
-          });
-          
-          await this.battle.ability.executeAbility(
-            state.currentTurn,
-            decision.target,
-            state.aliveEnemies,
-            state.aliveTeam,
-            decision.abilityName
-          );
-          
-          this.battle.addBattleLog(`+ ${this.player.name} uses ${decision.abilityName} on ${decision.target.name}`);
+          if (decision.isMultiTarget && Array.isArray(decision.target)) {
+            // REMOVED: Repetitive execution log
+            
+            this.battle.stateManager.updateState({
+              enemyToHit: decision.target,
+              pickedChoice: true
+            });
+
+            await this.battle.ability.executeAbility(
+              state.currentTurn,
+              decision.target,
+              state.aliveEnemies,
+              state.aliveTeam,
+              decision.abilityName
+            );
+            
+            const targetNames = decision.target.map(t => t.name).join(', ');
+            this.battle.addBattleLog(`+ ${currentTurnName} uses ${decision.abilityName} on ${targetNames}`);
+          } else {
+            const singleTarget = Array.isArray(decision.target) ? decision.target[0] : decision.target;
+            
+            this.battle.stateManager.setPlayerTarget(currentPlayerId, singleTarget, false);
+            
+            this.battle.stateManager.updateState({
+              enemyToHit: singleTarget,
+              pickedChoice: true
+            });
+
+            await this.battle.ability.executeAbility(
+              state.currentTurn,
+              singleTarget,
+              state.aliveEnemies,
+              state.aliveTeam,
+              decision.abilityName
+            );
+            
+            this.battle.addBattleLog(`+ ${currentTurnName} uses ${decision.abilityName} on ${singleTarget.name}`);
+          }
         }
         break;
         
@@ -314,7 +647,7 @@ export class PvPAI {
         });
         
         await this.battle.turnManager.performPlayerTurn();
-        this.battle.addBattleLog(`+ ${this.player.name} attempts to dodge`);
+        this.battle.addBattleLog(`+ ${currentTurnName} attempts to dodge`);
         break;
     }
   }
@@ -323,17 +656,33 @@ export class PvPAI {
     const state = this.battle.stateManager.getState();
     let targets: AITarget[] = [];
     
-    if (this.battle.player && this.battle.player.stats.hp > 0) {
+    if (this.battle.player && 
+        this.battle.player.stats && 
+        this.battle.player.stats.hp > 0 && 
+        this.battle.player.stats.defense !== undefined) {
       targets.push(this.battle.player);
     }
     
-    const aliveFamiliars = this.battle.familiarInfo.filter(
-      (familiar: any) => familiar.stats.hp > 0
+    const aliveFamiliars = (this.battle.familiarInfo || []).filter(
+      (familiar: any) => familiar && 
+                         familiar.stats && 
+                         familiar.stats.hp > 0 && 
+                         familiar.stats.defense !== undefined &&
+                         familiar.name
     );
     
     targets = targets.concat(aliveFamiliars);
     
-    console.log(`[PvPAI] Available targets: ${targets.map(t => t.name).join(', ')}`);
-    return targets;
+    const validTargets = targets.filter(target => 
+      target && 
+      target.name && 
+      target.stats && 
+      typeof target.stats.defense === 'number' &&
+      target.stats.hp > 0
+    );
+    
+    // KEEP: This shows valid targets - useful for debugging target issues
+    console.log(`[PvPAI] Available valid targets: ${validTargets.map(t => t.name).join(', ')}`);
+    return validTargets;
   }
 }
