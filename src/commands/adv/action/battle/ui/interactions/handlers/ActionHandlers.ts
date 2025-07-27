@@ -39,7 +39,7 @@ export class ActionHandlers {
     // ADD DELAY BEFORE COMPLETING TURN IN PvE
     if (this.battle.mode === 'pve') {
       console.log(`\x1b[35m[ActionHandlers]\x1b[0m Adding 750ms delay for PvE turn processing...`);
-      await new Promise(resolve => setTimeout(resolve, 750));
+
     }
     
     await this.completeTurn(state.currentTurn.name);

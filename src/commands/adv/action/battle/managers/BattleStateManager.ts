@@ -41,7 +41,8 @@ export class BattleStateManager {
   }
 
   addBattleLog(message: string): void {
-    this.state.battleLogs.push(message);
+    console.trace(`\x1b[35m[BATTLE LOG]\x1b[0m ${message}`);
+  this.state.battleLogs.push(message);
   }
 
   clearBattleLogs(): void {

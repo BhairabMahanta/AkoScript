@@ -56,7 +56,7 @@ export class AbilityHandlers {
     // ADD DELAY BEFORE COMPLETING TURN IN PvE
     if (this.battle.mode === 'pve') {
       console.log(`\x1b[35m[AbilityHandlers]\x1b[0m Adding 750ms delay for PvE ability processing...`);
-      await new Promise(resolve => setTimeout(resolve, 750));
+
     }
     
     await this.battle.turnManager.completeTurnAndContinue();

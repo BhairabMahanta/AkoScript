@@ -565,92 +565,94 @@ export class PvPAI {
     return selectedAbility;
   }
 
-  async executeDecision(decision: AIDecision): Promise<void> {
-    // KEEP: This shows AI execution
-    console.log(`[PvPAI] Executing decision: ${decision.action} - ${decision.reasoning}`);
-    
-    const state = this.battle.stateManager.getState();
-    const currentPlayerId = this.player.id || this.player._id;
-    const currentTurnName = state.currentTurn?.name || 'Unknown';
-    
-    switch (decision.action) {
-      case 'basic_attack':
-        if (decision.target && !Array.isArray(decision.target)) {
-          this.battle.stateManager.setPlayerTarget(currentPlayerId, decision.target, false);
-          
-          this.battle.stateManager.updateState({
-            enemyToHit: decision.target,
-            pickedChoice: true
-          });
-          
-          await this.battle.turnManager.performPlayerTurn();
-        }
-        break;
-        
-      case 'ability':
-        if (decision.target && decision.abilityName) {
-          if (decision.isMultiTarget && Array.isArray(decision.target)) {
-            // REMOVED: Repetitive execution log
-            
-            this.battle.stateManager.updateState({
-              enemyToHit: decision.target,
-              pickedChoice: true
-            });
-
-            await this.battle.ability.executeAbility(
-              state.currentTurn,
-              decision.target,
-              state.aliveEnemies,
-              state.aliveTeam,
-              decision.abilityName
-            );
-            
-            const targetNames = decision.target.map(t => t.name).join(', ');
-            this.battle.addBattleLog(`+ ${currentTurnName} uses ${decision.abilityName} on ${targetNames}`);
-          } else {
-            const singleTarget = Array.isArray(decision.target) ? decision.target[0] : decision.target;
-            
-            this.battle.stateManager.setPlayerTarget(currentPlayerId, singleTarget, false);
-            
-            this.battle.stateManager.updateState({
-              enemyToHit: singleTarget,
-              pickedChoice: true
-            });
-
-            await this.battle.ability.executeAbility(
-              state.currentTurn,
-              singleTarget,
-              state.aliveEnemies,
-              state.aliveTeam,
-              decision.abilityName
-            );
-            
-            this.battle.addBattleLog(`+ ${currentTurnName} uses ${decision.abilityName} on ${singleTarget.name}`);
-          }
-        }
-        break;
-        
-      case 'dodge':
-        const dodgeOptions = [
-          "dodge_and_increase_attack_bar",
-          "dodge",
-          "reduce_damage",
-          "take_hit",
-          "take_1.5x_damage",
-        ];
-        
-        const randomDodge = dodgeOptions[Math.floor(Math.random() * dodgeOptions.length)];
+// In your PvPAI.ts - Update the executeDecision method
+async executeDecision(decision: AIDecision): Promise<void> {
+  console.log(`[PvPAI] Executing decision: ${decision.action} - ${decision.reasoning}`);
+  
+  const state = this.battle.stateManager.getState();
+  const currentPlayerId = this.player.id || this.player._id;
+  const currentTurnName = state.currentTurn?.name || 'Unknown';
+  
+  // AI actions should use - (red) symbol
+  const aiSymbol = '-';
+  
+  switch (decision.action) {
+    case 'basic_attack':
+      if (decision.target && !Array.isArray(decision.target)) {
+        this.battle.stateManager.setPlayerTarget(currentPlayerId, decision.target, false);
         
         this.battle.stateManager.updateState({
-          dodge: { option: randomDodge, id: state.currentTurn?._id },
+          enemyToHit: decision.target,
           pickedChoice: true
         });
         
         await this.battle.turnManager.performPlayerTurn();
-        this.battle.addBattleLog(`+ ${currentTurnName} attempts to dodge`);
-        break;
-    }
+      }
+      break;
+      
+    case 'ability':
+      if (decision.target && decision.abilityName) {
+        if (decision.isMultiTarget && Array.isArray(decision.target)) {
+          this.battle.stateManager.updateState({
+            enemyToHit: decision.target,
+            pickedChoice: true
+          });
+
+          await this.battle.ability.executeAbility(
+            state.currentTurn,
+            decision.target,
+            state.aliveEnemies,
+            state.aliveTeam,
+            decision.abilityName
+          );
+          
+          const targetNames = decision.target.map(t => t.name).join(', ');
+          this.battle.addBattleLog(`${aiSymbol} ${currentTurnName} uses ${decision.abilityName} on ${targetNames}`);
+        } else {
+          const singleTarget = Array.isArray(decision.target) ? decision.target[0] : decision.target;
+          
+          this.battle.stateManager.setPlayerTarget(currentPlayerId, singleTarget, false);
+          
+          this.battle.stateManager.updateState({
+            enemyToHit: singleTarget,
+            pickedChoice: true
+          });
+
+          await this.battle.ability.executeAbility(
+            state.currentTurn,
+            singleTarget,
+            state.aliveEnemies,
+            state.aliveTeam,
+            decision.abilityName
+          );
+          
+          this.battle.addBattleLog(`${aiSymbol} ${currentTurnName} uses ${decision.abilityName} on ${singleTarget.name}`);
+        }
+      }
+      break;
+      
+    case 'dodge':
+      const dodgeOptions = [
+        "dodge_and_increase_attack_bar",
+        "dodge",
+        "reduce_damage",
+        "take_hit",
+        "take_1.5x_damage",
+      ];
+      
+      const randomDodge = dodgeOptions[Math.floor(Math.random() * dodgeOptions.length)];
+      
+      this.battle.stateManager.updateState({
+        dodge: { option: randomDodge, id: state.currentTurn?._id },
+        pickedChoice: true
+      });
+       this.battle.addBattleLog(`${aiSymbol} ${currentTurnName} attempts to dodge`);
+      await this.battle.turnManager.performPlayerTurn();
+     
+      break;
   }
+}
+
 
   getAvailableTargets(): AITarget[] {
     const state = this.battle.stateManager.getState();

@@ -1,4 +1,4 @@
-// managers/BattleResultManager.ts
+// managers/BattleResultManager.ts - COMPLETE VERSION (NO DIRECT EMBED UPDATES)
 import { quests } from "../../../quest/quests";
 import { addFloor } from "../../../../player/scenarioUpdate/scenarioFunctions";
 import { scenarios } from "../../../../../data/information/scenarios";
@@ -6,12 +6,17 @@ import { EmbedBuilder } from "discord.js";
 
 export class BattleResultManager {
   private battle: any;
+  private battleEnded: boolean = false; // ADD THIS
 
   constructor(battle: any) {
     this.battle = battle;
   }
+
   async handleVictory(): Promise<void> {
-    console.log("[BattleResultManager] Handling victory");
+    if (this.battleEnded) return; // Prevent duplicate handling
+    this.battleEnded = true;
+    
+    console.log(`\x1b[32m[BattleResultManager]\x1b[0m Handling victory (${this.battle.mode})`);
     
     if (this.battle.mode === 'pve') {
       await this.handlePvEVictory();
@@ -21,7 +26,10 @@ export class BattleResultManager {
   }
 
   async handleDefeat(): Promise<void> {
-    console.log("[BattleResultManager] Handling defeat");
+    if (this.battleEnded) return; // Prevent duplicate handling
+    this.battleEnded = true;
+    
+    console.log(`\x1b[31m[BattleResultManager]\x1b[0m Handling defeat (${this.battle.mode})`);
     
     if (this.battle.mode === 'pve') {
       await this.handlePvEDefeat();
@@ -29,6 +37,7 @@ export class BattleResultManager {
       await this.handlePvPDefeat();
     }
   }
+
   async printBattleResult(): Promise<void> {
     const state = this.battle.stateManager.getState();
     
@@ -47,14 +56,18 @@ export class BattleResultManager {
       } else {
         await this.handlePvPDefeat();
       }
-     } 
-     else {
-      await this.updateBattleDisplay();
     }
+    // REMOVED: updateBattleDisplay() - no more direct embed updates
   }
 
   private async handlePvEVictory(): Promise<void> {
-    const waveResult = this.battle.waveManager.getNextWave();
+    const waveManager = this.battle.getWaveManager();
+    if (!waveManager) {
+      await this.handleFinalPvEVictory();
+      return;
+    }
+    
+    const waveResult = waveManager.getNextWave();
     
     if (!waveResult.hasNextWave) {
       await this.handleFinalPvEVictory();
@@ -67,59 +80,51 @@ export class BattleResultManager {
     const winner = this.battle.player;
     const loser = this.battle.player2;
     
-    // Create victory embed
-    if (!this.battle.battleEmbed) {
-      this.battle.battleEmbed = new EmbedBuilder()
-        .setTitle(`PvP Victory!`)
-        .setColor(0x00ff00);
-    }
+    console.log(`\x1b[32m[BattleResultManager]\x1b[0m PvP Victory: ${winner.name} defeats ${loser.name}`);
     
-    this.battle.battleEmbed.setFields({
-      name: `${winner.name} Wins!`,
-      value: `${winner.name} has defeated ${loser.name} in PvP combat!`,
-      inline: true,
-    });
+    // Create victory embed (but don't send it - let TurnManager handle final update)
+    this.battle.battleEmbed = new EmbedBuilder()
+      .setTitle(`PvP Victory!`)
+      .setColor(0x00ff00)
+      .setFields({
+        name: `${winner.name} Wins!`,
+        value: `${winner.name} has defeated ${loser.name} in PvP combat!`,
+        inline: true,
+      })
+      .setDescription("🎉 Victory achieved in PvP battle!");
     
-    this.battle.battleEmbed.setDescription("🎉 Victory achieved in PvP battle!");
-    
-    if (this.battle.initialMessage) {
-      await this.battle.initialMessage.edit({
-        embeds: [this.battle.battleEmbed],
-        components: [],
-      });
-    }
+    // Set battle as ended - TurnManager will handle final embed update
+    this.battle.stateManager.updateState({ continue: false });
   }
 
   private async handlePvEDefeat(): Promise<void> {
+    console.log(`\x1b[31m[BattleResultManager]\x1b[0m PvE Defeat`);
     this.battle.message.channel.send("You lost, skill issue.");
     this.battle.player.stats.speed = 0;
+    
+    // Set battle as ended
+    this.battle.stateManager.updateState({ continue: false });
   }
 
   private async handlePvPDefeat(): Promise<void> {
     const winner = this.battle.player2;
     const loser = this.battle.player;
     
-    // Create defeat embed
-    if (!this.battle.battleEmbed) {
-      this.battle.battleEmbed = new EmbedBuilder()
-        .setTitle(`PvP Defeat`)
-        .setColor(0xff0000);
-    }
+    console.log(`\x1b[31m[BattleResultManager]\x1b[0m PvP Defeat: ${winner.name} defeats ${loser.name}`);
     
-    this.battle.battleEmbed.setFields({
-      name: `${winner.name} Wins!`,
-      value: `${loser.name} has been defeated by ${winner.name} in PvP combat!`,
-      inline: true,
-    });
+    // Create defeat embed (but don't send it - let TurnManager handle final update)
+    this.battle.battleEmbed = new EmbedBuilder()
+      .setTitle(`PvP Defeat`)
+      .setColor(0xff0000)
+      .setFields({
+        name: `${winner.name} Wins!`,
+        value: `${loser.name} has been defeated by ${winner.name} in PvP combat!`,
+        inline: true,
+      })
+      .setDescription("💀 Defeat in PvP battle!");
     
-    this.battle.battleEmbed.setDescription("💀 Defeat in PvP battle!");
-    
-    if (this.battle.initialMessage) {
-      await this.battle.initialMessage.edit({
-        embeds: [this.battle.battleEmbed],
-        components: [],
-      });
-    }
+    // Set battle as ended
+    this.battle.stateManager.updateState({ continue: false });
   }
 
   private async handleFinalPvEVictory(): Promise<void> {
@@ -128,37 +133,29 @@ export class BattleResultManager {
     await this.updatePlayerQuests();
     await this.updatePlayerRewards(rewards);
     
-    // Only update scenario progress for PvE
     if (this.battle.selectedScenario) {
       await this.updatePlayerProgress();
     }
     
-    // Create victory embed
-    if (!this.battle.battleEmbed) {
-      this.battle.battleEmbed = new EmbedBuilder()
-        .setTitle(`Victory against ${this.battle.enemyDetails.name}`)
-        .setColor(0x00ff00);
-    }
+    console.log(`\x1b[32m[BattleResultManager]\x1b[0m Final PvE Victory against ${this.battle.enemyDetails.name}`);
     
-    this.battle.battleEmbed.setFields({
-      name: "You won the battle!",
-      value: `Rewards:\nExp: ${rewards.experience || 0}\nGold: ${rewards.gold || 0}`,
-      inline: true,
-    });
+    // Create victory embed (but don't send it - let TurnManager handle final update)
+    this.battle.battleEmbed = new EmbedBuilder()
+      .setTitle(`Victory against ${this.battle.enemyDetails.name}`)
+      .setColor(0x00ff00)
+      .setFields({
+        name: "You won the battle!",
+        value: `Rewards:\nExp: ${rewards.experience || 0}\nGold: ${rewards.gold || 0}`,
+        inline: true,
+      })
+      .setDescription("GGs You've won");
     
-    this.battle.battleEmbed.setDescription("GGs You've won");
-    
-    if (this.battle.initialMessage) {
-      await this.battle.initialMessage.edit({
-        embeds: [this.battle.battleEmbed],
-        components: [],
-      });
-    }
+    // Set battle as ended
+    this.battle.stateManager.updateState({ continue: false });
   }
 
-  // Keep existing helper methods but make them conditional for PvE only
   private async updatePlayerQuests(): Promise<void> {
-    if (this.battle.mode !== 'pve') return; // Skip for PvP
+    if (this.battle.mode !== 'pve') return;
     
     if (!this.battle.player.activeQuests) return;
 
@@ -176,7 +173,7 @@ export class BattleResultManager {
   }
 
   private async updatePlayerRewards(rewards: any): Promise<void> {
-    if (this.battle.mode !== 'pve') return; // Skip for PvP
+    if (this.battle.mode !== 'pve') return;
     
     try {
       const filter = { _id: this.battle.player._id };
@@ -200,10 +197,10 @@ export class BattleResultManager {
       await this.battle.collection.updateOne(filter, updates);
     } catch (error) {
       console.error("Error updating player rewards:", error);
-      // ✅ NEW: Don't let reward update failure break the entire battle
       this.battle.addBattleLog("Warning: Failed to update player rewards, but battle completed successfully.");
     }
   }
+
   private async updatePlayerProgress(): Promise<void> {
     const selectedScenario = scenarios.find(
       (scenario) => scenario.id === this.battle.selectedScenario.id
@@ -221,7 +218,7 @@ export class BattleResultManager {
     }
   }
 
- private processDeadEnemies(): void {
+  private processDeadEnemies(): void {
     const state = this.battle.stateManager.getState();
     
     for (const enemy of state.aliveEnemies) {
@@ -264,30 +261,14 @@ export class BattleResultManager {
       }
     }
   }
+
   private async continueToNextWave(): Promise<void> {
+    console.log(`\x1b[36m[BattleResultManager]\x1b[0m Continuing to next wave`);
+    
+    // REMOVED: Direct embed update - let TurnManager handle it
+    // Just wait and let normal turn flow continue
     await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    const updatedEmbed = await this.battle.initialisedEmbed.sendInitialEmbed(
-      this.battle.stateManager.getState().currentTurn,
-      this.battle.mobInfo
-    );
-    
-    this.battle.initialMessage.edit({
-      embeds: [updatedEmbed],
-      components: await this.battle.uiManager.createActionRows(),
-    });
   }
 
-  private async updateBattleDisplay(): Promise<void> {
-    const state = this.battle.stateManager.getState();
-    const updatedEmbed = await this.battle.initialisedEmbed.sendInitialEmbed(
-      state.currentTurn,
-      this.battle.mobInfo
-    );
-    
-    this.battle.initialMessage.edit({
-      embeds: [updatedEmbed],
-      components: await this.battle.uiManager.createActionRows(),
-    });
-  }
+  // REMOVED: updateBattleDisplay() - no more direct embed updates
 }
