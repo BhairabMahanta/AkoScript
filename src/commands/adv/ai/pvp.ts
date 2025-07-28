@@ -113,9 +113,6 @@ export class PvPAI {
       // REMOVED: console.log(`[PvPAI] Fallback: AI assumed to be defending`);
     }
     
-    // REMOVED: These 2 logs that repeat constantly
-    // console.log(`[PvPAI] AI Team (${aiTeam.length}): ${aiTeam.map((t: any) => t.name).join(', ')}`);
-    // console.log(`[PvPAI] Enemies (${enemies.length}): ${enemies.map((t: any) => t.name).join(', ')}`);
     
     return { aiTeam, enemies };
   }
@@ -346,9 +343,6 @@ export class PvPAI {
       return this.selectTarget(enemies.length > 0 ? enemies : availableTargets, 'attack');
     }
 
-    // REMOVED: Repetitive targeting info
-    // console.log(`[PvPAI] Selecting targets for ${abilityName} (type: ${ability.type}, logicType: ${ability.logicType})`);
-
     if (ability.selection && ability.selection.startsWith('modal_')) {
       const requiredCount = parseInt(ability.selection.replace('modal_', ''), 10);
       return this.selectMultipleTargets(ability, requiredCount, currentTurn);
@@ -376,13 +370,9 @@ export class PvPAI {
     
     if (shouldTargetTeam) {
       targetPool = aiTeam;
-      // REMOVED: Repetitive targeting logs
-      // console.log(`[PvPAI] Targeting AI's team for ${ability.name}, available team: ${targetPool.map(t => t.name).join(', ')}`);
-    } else {
+       } else {
       targetPool = enemies;
-      // REMOVED: Repetitive targeting logs
-      // console.log(`[PvPAI] Targeting enemies for ${ability.name}, available enemies: ${targetPool.map(t => t.name).join(', ')}`);
-    }
+  }
 
     if (targetPool.length === 0) {
       console.error(`[PvPAI] No valid targets available for ${ability.name}`);
@@ -483,11 +473,10 @@ export class PvPAI {
           return false;
         }
         
-        const isOnCooldown = this.battle.stateManager.isAbilityOnCooldown(abilityName, characterId);
+        const isOnCooldown = this.battle.stateManager.isAbilityOnCooldown(abilityName, currentTurn.name);
         
         if (isOnCooldown) {
-          // REMOVED: Repetitive cooldown log
-          // console.log(`[PvPAI] ${abilityName} is on cooldown for ${currentTurn.name}`);
+
           return false;
         }
         
@@ -647,8 +636,8 @@ async executeDecision(decision: AIDecision): Promise<void> {
         pickedChoice: true
       });
        this.battle.addBattleLog(`${aiSymbol} ${currentTurnName} attempts to dodge`);
-      await this.battle.turnManager.performPlayerTurn();
-     
+  // ✅ DON'T call performPlayerTurn() for dodge - just end the turn
+  // The dodge state is set, that's all we need
       break;
   }
 }

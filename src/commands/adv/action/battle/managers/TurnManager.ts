@@ -1,9 +1,10 @@
-// managers/TurnManager.ts - FIXED ATTACKBAR SYSTEM ONLY
+// managers/TurnManager.ts - MERGED AI EXECUTION WITH IMMEDIATE UPDATES
 import { generateAttackBarEmoji } from '../../../../util/glogic';
 import { cycleCooldowns } from '../../../../util/glogic';
 import { PvPAI } from '../../../ai/pvp';
 import { ExtendedPlayer } from '../../../../gamelogic/buffdebufflogic';
 import { Player } from '../../../../../data/mongo/playerschema';
+import abilities from '../../../../../data/abilities';
 
 export class TurnManager {
   private battle: any;
@@ -121,26 +122,21 @@ export class TurnManager {
     );
 
     if (currentEnemy && currentTurn?.stats.hp > 0) {
-      // AI ENEMY TURN
+      // AI ENEMY TURN - EXECUTE AND UPDATE IMMEDIATELY
       console.log(`\x1b[35m[TurnManager]\x1b[0m PvE AI Turn: ${currentTurn.name}`);
       
       await this.performEnemyTurn(currentTurn, currentEnemy);
       
-      // ADD DELAY FOR AI TURNS
+      // IMMEDIATE UPDATE + DELAY + CONTINUE (merged)
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // UPDATE EMBED AFTER AI TURN
       await this.performEmbedUpdate();
-      
       await this.continueToNextTurn();
     } else {
-      // PLAYER TURN
+      // PLAYER TURN - ONLY UPDATE IF IT'S THE FIRST PLAYER TURN IN SEQUENCE
       console.log(`\x1b[36m[TurnManager]\x1b[0m Player turn: ${currentTurn?.name || 'Unknown'}`);
       
-      // UPDATE EMBED FOR PLAYER TURN
+      // UPDATE EMBED TO SET UP PLAYER UI (this is necessary for buttons/dropdowns)
       await this.performEmbedUpdate();
-      
-      // Wait for player input - don't call continueToNextTurn()
     }
   }
 
@@ -148,39 +144,24 @@ export class TurnManager {
     console.log(`\x1b[33m[TurnManager]\x1b[0m handlePvPTurn for: ${currentTurn?.name}`);
     
     if (this.battle.mode === 'pvp_afk' && this.isAIPlayerTurn(currentTurn)) {
-      // AI PLAYER TURN
+      // AI PLAYER TURN - EXECUTE AND UPDATE IMMEDIATELY
       console.log(`\x1b[33m[TurnManager]\x1b[0m PvP AI Turn: ${currentTurn?.name}`);
       
-      await this.executeAITurn(currentTurn);
+      await this.executeAITurnImmediate(currentTurn);
     } else {
-      // HUMAN PLAYER TURN
+      // HUMAN PLAYER TURN - UPDATE TO SET UP UI
       console.log(`\x1b[36m[TurnManager]\x1b[0m Player turn: ${currentTurn?.name || 'Unknown'}`);
       
-      // UPDATE EMBED FOR PLAYER TURN
+      // UPDATE EMBED TO SET UP PLAYER UI (this is necessary for buttons/dropdowns)
       await this.performEmbedUpdate();
-      
-      // Wait for player input - don't call continueToNextTurn()
     }
   }
 
-  private isAIPlayerTurn(currentTurn: any | null): boolean {
-    if (!currentTurn || !this.battle.player2) return false;
-    
-    const player2Id = this.battle.player2.id || this.battle.player2._id;
-    
-    if (currentTurn.id === player2Id || currentTurn._id === player2Id) {
-      return true;
-    }
-    
-    return this.battle.player2FamiliarInfo.some((f: any) => 
-      f.serialId === currentTurn.serialId && f.name === currentTurn.name
-    );
-  }
-
-  private async executeAITurn(currentTurn: any | null): Promise<void> {
+  // NEW: Combined AI execution with immediate embed update and continuation
+  private async executeAITurnImmediate(currentTurn: any | null): Promise<void> {
     if (!this.pvpAI || !currentTurn) {
       console.error("\x1b[31m[TurnManager]\x1b[0m PvP AI not initialized");
-      await this.executeAIFallback(currentTurn);
+      await this.executeAIFallbackImmediate(currentTurn);
       return;
     }
     
@@ -193,50 +174,59 @@ export class TurnManager {
       
       if (validTargets.length === 0) {
         console.log("\x1b[31m[TurnManager]\x1b[0m No valid targets available for AI");
-        await this.executeAIFallback(currentTurn);
+        await this.executeAIFallbackImmediate(currentTurn);
         return;
       }
       
       const decision = await this.pvpAI.makeDecision(currentTurn, validTargets);
       console.log(`\x1b[32m[TurnManager]\x1b[0m AI decision: ${decision.action} - ${decision.reasoning}`);
       
-      // VALIDATE DECISION TARGETS
-      if (decision.target) {
-        const targets = Array.isArray(decision.target) ? decision.target : [decision.target];
-        const allTargetsValid = targets.every(t => t && t.name && t.stats && t.stats.defense !== undefined);
-        
-        if (!allTargetsValid) {
-          console.error("\x1b[31m[TurnManager]\x1b[0m AI decision contains invalid targets, using fallback");
-          await this.executeAIFallback(currentTurn);
-          return;
-        }
 
-        // PREVENT FRIENDLY FIRE - Check if AI is targeting teammates
-        const friendlyFire = targets.some(target => this.isAIPlayerTurn(target));
-        if (friendlyFire) {
-          console.error("\x1b[31m[TurnManager]\x1b[0m AI trying to attack teammate, using fallback");
-          await this.executeAIFallback(currentTurn);
-          return;
-        }
-      }
+// PREVENT FRIENDLY FIRE - BUT ALLOW DEFENSIVE ABILITIES
+if (decision.target && decision.abilityName) {
+  const ability = abilities[decision.abilityName];
+  const isDefensiveAbility = ability && (
+    ability.logicType === 'increase_defense' ||
+    ability.name.toLowerCase().includes('defend') ||
+    ability.name.toLowerCase().includes('protect') ||
+    ability.name.toLowerCase().includes('heal') ||
+    ability.name.toLowerCase().includes('buff') ||
+    ability.type.includes('buff') ||
+    ability.type.includes('heal')
+  );
+  
+  if (!isDefensiveAbility) {
+    // Only check friendly fire for OFFENSIVE abilities
+    const targets = Array.isArray(decision.target) ? decision.target : [decision.target];
+    const friendlyFire = targets.some(target => this.isAIPlayerTurn(target));
+    
+    if (friendlyFire) {
+      console.error("AI trying to attack teammate with offensive ability, using fallback");
+      await this.executeAIFallbackImmediate(currentTurn);
+      return;
+    }
+  } else {
+    console.log(`✅ Allowing defensive ability ${decision.abilityName} to target teammates`);
+  }
+}
+
       
+      // EXECUTE AI DECISION
       await this.pvpAI.executeDecision(decision);
-      
-      // ADD DELAY FOR AI TURNS
+      await cycleCooldowns(this.battle.stateManager.getState().cooldowns, currentTurn.name);
+      // IMMEDIATE: Delay + Update + Continue (all merged)
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // UPDATE EMBED AFTER AI TURN
       await this.performEmbedUpdate();
-      
       await this.continueToNextTurn();
       
     } catch (error) {
       console.error("\x1b[31m[TurnManager]\x1b[0m Error in AI turn execution:", error);
-      await this.executeAIFallback(currentTurn);
+      await this.executeAIFallbackImmediate(currentTurn);
     }
   }
 
-  private async executeAIFallback(currentTurn: any | null): Promise<void> {
+  // NEW: Immediate AI fallback with merged update
+  private async executeAIFallbackImmediate(currentTurn: any | null): Promise<void> {
     console.log("\x1b[33m[TurnManager]\x1b[0m Executing AI fallback action");
     
     if (!currentTurn) {
@@ -245,15 +235,12 @@ export class TurnManager {
     }
     
     try {
-      // GET PROPER ENEMY TARGETS (NO FRIENDLY FIRE)
       let availableTargets: any[] = [];
       
       if (this.battle.mode === 'pvp_afk') {
-        // AI should target Player 1 team only
         availableTargets = [this.battle.player, ...this.battle.familiarInfo]
           .filter((target: any) => target && target.stats && target.stats.hp > 0 && target.stats.defense !== undefined);
       } else {
-        // PvE mode - target enemies
         availableTargets = this.battle.stateManager.getState().aliveEnemies
           .filter((target: any) => target && target.stats && target.stats.hp > 0 && target.stats.defense !== undefined);
       }
@@ -271,7 +258,7 @@ export class TurnManager {
           pickedChoice: true
         });
         
-        await this.battle.turnManager.performPlayerTurn();
+        await this.performPlayerTurn();
         this.battle.addBattleLog(`- ${currentTurn.name} attacks ${randomTarget.name} using basic attack (AI fallback)`);
       } else {
         console.error("\x1b[31m[TurnManager]\x1b[0m No valid targets for AI fallback");
@@ -280,10 +267,24 @@ export class TurnManager {
       console.error("\x1b[31m[TurnManager]\x1b[0m Error in AI fallback:", error);
     }
     
-    // ADD DELAY AND CONTINUE
+    // IMMEDIATE: Delay + Update + Continue (all merged)
     await new Promise(resolve => setTimeout(resolve, 1000));
     await this.performEmbedUpdate();
     await this.continueToNextTurn();
+  }
+
+  private isAIPlayerTurn(currentTurn: any | null): boolean {
+    if (!currentTurn || !this.battle.player2) return false;
+    
+    const player2Id = this.battle.player2.id || this.battle.player2._id;
+    
+    if (currentTurn.id === player2Id || currentTurn._id === player2Id) {
+      return true;
+    }
+    
+    return this.battle.player2FamiliarInfo.some((f: any) => 
+      f.serialId === currentTurn.serialId && f.name === currentTurn.name
+    );
   }
 
   private clearTargetsForDeadCharacter(deadCharacter: any): void {
@@ -471,6 +472,7 @@ export class TurnManager {
 
   // =================== EMBED UPDATE SYSTEM ===================
 
+  // MODIFIED: Smart embed update that only updates when necessary
   async completeTurnAndContinue(): Promise<void> {
     console.log(`\x1b[94m[EMBED]\x1b[0m completeTurnAndContinue() called - player action completed`);
     
@@ -490,8 +492,27 @@ export class TurnManager {
       return;
     }
 
-    await this.performEmbedUpdate();
+    // CHECK: If next turn is AI, don't update here (AI will handle it immediately)
     await this.continueToNextTurn();
+    
+    // SMART UPDATE: Only update if the next turn is a player turn
+    const nextState = this.battle.stateManager.getState();
+    const nextTurn = nextState.currentTurn;
+    
+    if (nextTurn && !this.isAITurn(nextTurn)) {
+      console.log(`\x1b[96m[EMBED]\x1b[0m Next turn is player, updating embed for UI setup`);
+      // The embed will be updated in handlePvPTurn/handlePvETurn for player turns
+    }
+  }
+
+  // NEW: Check if a turn belongs to AI
+  private isAITurn(currentTurn: any): boolean {
+    if (this.battle.mode === 'pve') {
+      const state = this.battle.stateManager.getState();
+      return state.aliveEnemies.some((enemy: any) => enemy.name === currentTurn?.name);
+    } else {
+      return this.isAIPlayerTurn(currentTurn);
+    }
   }
 
   private queueEmbedUpdate(delay: number = 750): void {

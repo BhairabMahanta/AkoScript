@@ -50,20 +50,46 @@ export class DiscordInteractionManager {
     }
   }
 
-  private async isValidInteraction(i: any): Promise<boolean> {
-    if (this.battle.mode !== 'pve') {
-      const isCurrentPlayersTurn = this.isCurrentPlayersTurn(i.user.id);
-      
-      if (!isCurrentPlayersTurn) {
-        await i.reply({ 
-          content: "It's not your turn! Wait for your opponent to finish their turn.", 
-          ephemeral: true 
-        });
-        return false;
-      }
+private async isValidInteraction(i: any): Promise<boolean> {
+  // ✅ Block ALL interactions during AI processing
+  if (this.battle.mode === 'pvp_afk') {
+    const state = this.battle.stateManager.getState();
+    const currentTurn = state.currentTurn;
+    
+    // Check if current turn belongs to AI
+    if (this.characterIdentifier.isAICharacterTurn(currentTurn)) {
+      await i.reply({ 
+        content: "AI is processing its turn. Please wait...", 
+        ephemeral: true 
+      });
+      return false;
     }
-    return true;
+    
+    // ✅ Additional protection: Check if AI is mid-execution
+    if (this.battle.turnManager.isAIExecuting || this.battle.turnManager.embedUpdateInProgress) {
+      await i.reply({ 
+        content: "AI turn is still being processed. Please wait...", 
+        ephemeral: true 
+      });
+      return false;
+    }
   }
+  
+  // Rest of validation...
+  if (this.battle.mode !== 'pve') {
+    const isCurrentPlayersTurn = this.isCurrentPlayersTurn(i.user.id);
+    
+    if (!isCurrentPlayersTurn) {
+      await i.reply({ 
+        content: "It's not your turn! Wait for your opponent to finish their turn.", 
+        ephemeral: true 
+      });
+      return false;
+    }
+  }
+  return true;
+}
+
 
   private async isCharacterAlive(i: any): Promise<boolean> {
     const state = this.battle.stateManager.getState();

@@ -143,7 +143,7 @@ export class ActionHandlers {
   private async completeTurn(currentPlayerId: any): Promise<void> {
     console.log(`\x1b[34m[ActionHandlers]\x1b[0m Completing turn for: ${currentPlayerId}`);
     const state = this.battle.stateManager.getState();
-    await cycleCooldowns(state.cooldowns, currentPlayerId);
+    // await cycleCooldowns(state.cooldowns, currentPlayerId);
     await this.battle.turnManager.completeTurnAndContinue();
   }
 }
